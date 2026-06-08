@@ -3,7 +3,6 @@ import { useOBSConnection } from './hooks/useOBSConnection.js'
 import { StatTile } from './components/StatTile.jsx'
 import { BranchOutputPanel } from './components/BranchOutputPanel.jsx'
 import { AudioPanel } from './components/AudioPanel.jsx'
-import { VDONinjaPanel } from './components/VDONinjaPanel.jsx'
 import { SettingsPanel } from './components/SettingsPanel.jsx'
 import { getStreamTiles, getStreamAlerts } from './components/StreamPanel.jsx'
 import { getSystemTiles, getSystemAlerts } from './components/SystemPanel.jsx'
@@ -153,9 +152,6 @@ export default function App() {
 
       {/* Audio compact chips */}
       <AudioPanel audioInputs={audioInputs} />
-
-      {/* VDO.ninja accordion */}
-      <VDONinjaPanel settings={settings} />
 
       {/* Settings */}
       <SettingsPanel settings={settings} onSave={handleSaveSettings} />
