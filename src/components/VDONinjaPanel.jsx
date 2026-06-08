@@ -12,16 +12,9 @@ function packetLossTooltip(pct) {
   return `${pct.toFixed(2)}% packet loss on VDO.ninja connection.\n\nHigh packet loss causes video artifacts and freezing.\n\nCauses: weak WiFi, network congestion, distance to peer.\n\nTry: switching guest to wired ethernet, or lowering their video quality.`
 }
 
-// Append params VDO.ninja needs for iframe stats API — safe to add even if already present
+// Use the URL as-is — extra params break VDO.ninja's iframe API
 function buildIframeSrc(url) {
-  try {
-    const u = new URL(url)
-    if (!u.searchParams.has('statsapi')) u.searchParams.set('statsapi', '1')
-    if (!u.searchParams.has('autostart')) u.searchParams.set('autostart', '1')
-    return u.toString()
-  } catch {
-    return url
-  }
+  return url
 }
 
 function extractStats(data) {
@@ -53,8 +46,8 @@ function GuestDetail({ guest }) {
     let intervalId = null
 
     function handleMessage(e) {
-      // Don't filter by e.source — cross-origin source refs can be unreliable in OBS browser
-      // Instead just check the data shape
+      if (!iframeRef.current) return
+      if (e.source !== iframeRef.current.contentWindow) return
       const s = extractStats(e.data)
       if (s) {
         setGuestStats(s)
@@ -63,18 +56,18 @@ function GuestDetail({ guest }) {
     }
 
     window.addEventListener('message', handleMessage)
-    // Poll the iframe — also try legacy string format some VDO.ninja versions use
-    intervalId = setInterval(() => {
-      try {
-        const cw = iframeRef.current?.contentWindow
-        if (!cw) return
-        cw.postMessage({ getStats: true }, '*')
-        cw.postMessage('getStats', '*')
-      } catch {}
-    }, 1000)
+    // Give VDO.ninja 8s to establish the WebRTC connection before polling
+    const startDelay = setTimeout(() => {
+      intervalId = setInterval(() => {
+        try {
+          iframeRef.current?.contentWindow?.postMessage({ getStats: true }, '*')
+        } catch {}
+      }, 1000)
+    }, 8000)
 
     return () => {
       window.removeEventListener('message', handleMessage)
+      clearTimeout(startDelay)
       clearInterval(intervalId)
     }
   }, [guest.url])
@@ -86,8 +79,8 @@ function GuestDetail({ guest }) {
       <iframe
         ref={iframeRef}
         src={iframeSrc}
-        style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: 2, height: 2, opacity: 0, pointerEvents: 'none' }}
-        allow="autoplay;camera;microphone;display-capture"
+        style={{ width: '100%', height: 120, border: 'none', borderRadius: 4, background: '#000', display: live ? 'block' : 'block' }}
+        allow="autoplay;camera;microphone;fullscreen;picture-in-picture;"
         title={`vdo-${guest.label}`}
       />
       <div className="branch-output-header">
