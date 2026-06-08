@@ -272,3 +272,89 @@ html, body, #root {
   max-width: 180px;
 }
 .badge-idle { background: #444; color: #aaa; }
+
+/* Audio level bar */
+.audio-level-wrap {
+  height: 4px;
+  background: var(--bg3);
+  border-radius: 2px;
+  margin: 2px 0 4px;
+  overflow: hidden;
+}
+.audio-level-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.1s;
+}
+.audio-level-green  { background: var(--green); }
+.audio-level-yellow { background: var(--yellow); }
+.audio-level-red    { background: var(--red); }
+.audio-level-muted  { background: var(--gray); }
+
+/* VDO.ninja guest sub-panels */
+.vdo-guest {
+  border-top: 1px solid #333;
+  padding-top: 6px;
+  margin-top: 6px;
+}
+.vdo-guest:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.vdo-guest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.vdo-guest-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+/* Settings VDO guest rows */
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+.vdo-guest-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.vdo-guest-row-label {
+  font-weight: 600;
+  color: var(--text);
+  min-width: 60px;
+}
+.vdo-guest-row-url {
+  color: var(--text-dim);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vdo-guest-remove {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 1px 5px;
+}
+.vdo-guest-remove:hover { color: var(--red); border-color: var(--red); }
+.vdo-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}

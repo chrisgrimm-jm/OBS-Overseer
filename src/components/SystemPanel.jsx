@@ -22,6 +22,19 @@ function fpsColor(fps, target = 30) {
   return 'red'
 }
 
+function diskColor(mb) {
+  if (mb == null) return 'gray'
+  if (mb > 10000) return 'green'
+  if (mb >= 2000) return 'yellow'
+  return 'red'
+}
+
+function diskTooltip(mb) {
+  if (mb == null) return null
+  const gb = (mb / 1024).toFixed(1)
+  return `Available disk space on OBS recording drive.\n\n${gb} GB free\n\nThresholds: >10 GB good · 2–10 GB warning · <2 GB critical\n\nLow disk space will cause recordings to stop mid-show.`
+}
+
 function lagColor(pct) {
   if (pct == null) return 'gray'
   if (pct <= 0) return 'green'
@@ -88,6 +101,7 @@ export function SystemPanel({ stats }) {
     renderTotalFrames,
     outputSkippedFrames,
     outputTotalFrames,
+    availableDiskSpace,
   } = stats
 
   const cpu = cpuUsage != null ? cpuUsage.toFixed(1) : null
@@ -110,6 +124,7 @@ export function SystemPanel({ stats }) {
       <StatRow label="FPS" value={fps} color={fpsColor(activeFps)} tooltip={`Active output framerate.\n\nShould match your OBS canvas FPS setting. Drops below target indicate the system cannot render at the configured rate.`} />
       <StatRow label="Render lag" value={renderLagPct} unit="%" color={lagColor(renderLagPct)} tooltip={renderLagTooltip(renderLagPct)} />
       <StatRow label="Encode lag" value={encodeLagPct} unit="%" color={lagColor(encodeLagPct)} tooltip={encodeLagTooltip(encodeLagPct)} />
+      <StatRow label="Disk Free" value={availableDiskSpace != null ? (availableDiskSpace / 1024).toFixed(1) : null} unit=" GB" color={diskColor(availableDiskSpace)} tooltip={diskTooltip(availableDiskSpace)} />
     </section>
   )
 }

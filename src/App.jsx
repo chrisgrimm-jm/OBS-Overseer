@@ -5,6 +5,8 @@ import { RecordPanel } from './components/RecordPanel.jsx'
 import { SystemPanel } from './components/SystemPanel.jsx'
 import { SettingsPanel } from './components/SettingsPanel.jsx'
 import { BranchOutputPanel } from './components/BranchOutputPanel.jsx'
+import { AudioPanel } from './components/AudioPanel.jsx'
+import { VDONinjaPanel } from './components/VDONinjaPanel.jsx'
 
 function StatusDot({ status }) {
   const colorMap = { connected: 'green', connecting: 'yellow', error: 'red', disconnected: 'gray' }
@@ -18,7 +20,7 @@ function StatusDot({ status }) {
 }
 
 export default function App() {
-  const { status, obsVersion, stats, streamStatus, recordStatus, outputList, settings, saveSettings, reconnect } = useOBSConnection()
+  const { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, settings, saveSettings, reconnect } = useOBSConnection()
 
   function handleSaveSettings(newSettings) {
     saveSettings(newSettings)
@@ -37,6 +39,8 @@ export default function App() {
         <StreamPanel streamStatus={streamStatus} />
         <RecordPanel recordStatus={recordStatus} />
         <BranchOutputPanel outputList={outputList} />
+        <AudioPanel audioInputs={audioInputs} />
+        <VDONinjaPanel settings={settings} />
         <SystemPanel stats={stats} />
       </div>
 

@@ -14,6 +14,7 @@ export function loadSettings() {
     host: params.get('host') || stored.host || 'localhost',
     port: params.get('port') || stored.port || '4455',
     password: params.get('password') || stored.password || '',
+    vdoGuests: stored.vdoGuests || [],
   }
 }
 
@@ -28,19 +29,31 @@ export function useOBSConnection() {
   const [streamStatus, setStreamStatus] = useState(null)
   const [recordStatus, setRecordStatus] = useState(null)
   const [outputList, setOutputList] = useState([])
+  const [audioInputs, setAudioInputs] = useState([])
   const [settings, setSettingsState] = useState(loadSettings)
 
   const obsRef = useRef(null)
   const pollTimerRef = useRef(null)
+  const mutePollTimerRef = useRef(null)
   const reconnectTimerRef = useRef(null)
   const backoffRef = useRef(1000)
   const mountedRef = useRef(true)
   const connectRef = useRef(null)
 
+  const AUDIO_INPUT_KINDS = new Set([
+    'wasapi_input_capture', 'wasapi_output_capture',
+    'coreaudio_input_capture', 'coreaudio_output_capture',
+    'pulse_input_capture', 'pulse_output_capture',
+  ])
+
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current)
       pollTimerRef.current = null
+    }
+    if (mutePollTimerRef.current) {
+      clearInterval(mutePollTimerRef.current)
+      mutePollTimerRef.current = null
     }
   }, [])
 
@@ -105,6 +118,20 @@ export function useOBSConnection() {
     const obs = new OBSWebSocket()
     obsRef.current = obs
 
+    obs.on('InputVolumeMeters', ({ inputs }) => {
+      if (!mountedRef.current) return
+      setAudioInputs(prev => {
+        const levelMap = {}
+        for (const inp of inputs) {
+          levelMap[inp.inputName] = inp.inputLevelsMul?.[0]?.[0] ?? 0
+        }
+        return prev.map(a => levelMap[a.inputName] !== undefined
+          ? { ...a, level: levelMap[a.inputName] }
+          : a
+        )
+      })
+    })
+
     obs.on('ConnectionClosed', () => {
       if (!mountedRef.current) return
       setStatus('disconnected')
@@ -112,6 +139,7 @@ export function useOBSConnection() {
       setStreamStatus(null)
       setRecordStatus(null)
       setOutputList([])
+      setAudioInputs([])
       stopPolling()
       const delay = backoffRef.current
       backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF)
@@ -133,6 +161,34 @@ export function useOBSConnection() {
       setStatus('connected')
       poll(obs)
       pollTimerRef.current = setInterval(() => poll(obs), POLL_INTERVAL)
+
+      // Initialize audio inputs
+      try {
+        const { inputs } = await obs.call('GetInputList')
+        const audioList = (inputs || []).filter(i => AUDIO_INPUT_KINDS.has(i.inputKind))
+        const withMute = await Promise.all(
+          audioList.map(async i => {
+            const { inputMuted } = await obs.call('GetInputMuteStatus', { inputName: i.inputName }).catch(() => ({ inputMuted: false }))
+            return { inputName: i.inputName, inputMuted, level: 0 }
+          })
+        )
+        if (mountedRef.current) setAudioInputs(withMute)
+        // Poll mute status every 2 seconds
+        mutePollTimerRef.current = setInterval(async () => {
+          if (!mountedRef.current) return
+          const updated = await Promise.all(
+            withMute.map(async a => {
+              const { inputMuted } = await obs.call('GetInputMuteStatus', { inputName: a.inputName }).catch(() => ({ inputMuted: a.inputMuted }))
+              return inputMuted
+            })
+          )
+          if (mountedRef.current) {
+            setAudioInputs(prev => prev.map((a, i) => ({ ...a, inputMuted: updated[i] ?? a.inputMuted })))
+          }
+        }, 2000)
+      } catch {
+        // audio init failed, non-fatal
+      }
     } catch {
       if (!mountedRef.current) return
       setStatus('error')
@@ -168,5 +224,5 @@ export function useOBSConnection() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { status, obsVersion, stats, streamStatus, recordStatus, outputList, settings, saveSettings, reconnect }
+  return { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, settings, saveSettings, reconnect }
 }
