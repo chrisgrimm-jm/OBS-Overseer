@@ -41,20 +41,20 @@ export function SystemPanel({ stats }) {
 
   const {
     cpuUsage,
-    memoryUsageMb,
+    memoryUsage,
     activeFps,
-    renderMissedFrames,
+    renderSkippedFrames,
     renderTotalFrames,
     outputSkippedFrames,
     outputTotalFrames,
   } = stats
 
   const cpu = cpuUsage != null ? cpuUsage.toFixed(1) : null
-  const mem = memoryUsageMb != null ? memoryUsageMb.toFixed(0) : null
+  const mem = memoryUsage != null ? memoryUsage.toFixed(0) : null
   const fps = activeFps != null ? activeFps.toFixed(2) : null
 
-  const renderLagPct = (renderTotalFrames && renderMissedFrames != null)
-    ? parseFloat(((renderMissedFrames / renderTotalFrames) * 100).toFixed(2))
+  const renderLagPct = (renderTotalFrames && renderSkippedFrames != null)
+    ? parseFloat(((renderSkippedFrames / renderTotalFrames) * 100).toFixed(2))
     : null
 
   const encodeLagPct = (outputTotalFrames && outputSkippedFrames != null)
@@ -65,7 +65,7 @@ export function SystemPanel({ stats }) {
     <section className="panel">
       <h2 className="panel-title">System</h2>
       <StatRow label="CPU" value={cpu} unit="%" color={cpuColor(cpuUsage)} />
-      <StatRow label="Memory" value={mem} unit=" MB" color={memColor(memoryUsageMb)} />
+      <StatRow label="Memory" value={mem} unit=" MB" color={memColor(memoryUsage)} />
       <StatRow label="FPS" value={fps} color={fpsColor(activeFps)} />
       <StatRow label="Render lag" value={renderLagPct} unit="%" color={lagColor(renderLagPct)} />
       <StatRow label="Encode lag" value={encodeLagPct} unit="%" color={lagColor(encodeLagPct)} />

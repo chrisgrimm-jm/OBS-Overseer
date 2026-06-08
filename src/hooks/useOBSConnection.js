@@ -57,9 +57,26 @@ export function useOBSConnection() {
       setStats(s)
       setStreamStatus(stream)
       setRecordStatus(record)
-      // Filter to branch/ISO outputs — exclude the built-in simple_file_output and adv_file_output
-      const builtIn = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output'])
-      setOutputList((outputs.outputs || []).filter(o => !builtIn.has(o.outputName) && !builtIn.has(o.outputKind)))
+      // Filter to branch/ISO outputs only — exclude built-in, replay buffer, virtual cam, vertical backtrack
+      const excludedKinds = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output', 'replay_buffer', 'virtualcam_output'])
+      const excludedNamePatterns = /replay.?buffer|virtual.?cam|vertical.?backtrack/i
+      const branchOutputs = (outputs.outputs || []).filter(o =>
+        !excludedKinds.has(o.outputKind) &&
+        !excludedKinds.has(o.outputName) &&
+        !excludedNamePatterns.test(o.outputName)
+      )
+      // Fetch settings for each branch output to get encoder info
+      const withSettings = await Promise.all(
+        branchOutputs.map(async o => {
+          try {
+            const s = await obs.call('GetOutputSettings', { outputName: o.outputName })
+            return { ...o, settings: s.outputSettings || {} }
+          } catch {
+            return { ...o, settings: {} }
+          }
+        })
+      )
+      setOutputList(withSettings)
     } catch {
       // disconnect handler will fire
     }

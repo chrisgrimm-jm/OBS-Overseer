@@ -17,6 +17,25 @@ function droppedStatus(dropped, total) {
   return 'green'
 }
 
+function encoderLabel(settings) {
+  // Encoder name comes from the output settings — key varies by plugin
+  const enc = settings?.encoder || settings?.video_encoder || settings?.['video-encoder'] || ''
+  if (!enc) return null
+  // Clean up common internal names to readable labels
+  const map = {
+    'obs_x264': 'x264',
+    'ffmpeg_aac': 'AAC',
+    'jim_nvenc': 'NVENC H.264',
+    'jim_hevc_nvenc': 'NVENC HEVC',
+    'com.apple.videotoolbox.videoencoder.ave.avc': 'Apple VT H.264',
+    'com.apple.videotoolbox.videoencoder.ave.hevc': 'Apple VT HEVC',
+    'h264_texture_amf': 'AMD H.264',
+    'av1_texture_amf': 'AMD AV1',
+    'obs_qsv11': 'QSV H.264',
+  }
+  return map[enc] || enc
+}
+
 export function BranchOutputPanel({ outputList }) {
   if (!outputList || outputList.length === 0) return null
 
@@ -28,6 +47,12 @@ export function BranchOutputPanel({ outputList }) {
         const dropped = output.outputDroppedFrames ?? 0
         const total = output.outputTotalFrames ?? 0
         const droppedPct = total > 0 ? ((dropped / total) * 100).toFixed(2) : '0.00'
+        const s = output.settings || {}
+        const encoder = encoderLabel(s)
+        const bitrate = s.bitrate || s.videoBitrate || s.video_bitrate || null
+        const width = output.outputWidth || s.width || null
+        const height = output.outputHeight || s.height || null
+        const resolution = (width && height) ? `${width}×${height}` : null
 
         return (
           <div key={output.outputName} className="branch-output">
@@ -37,6 +62,9 @@ export function BranchOutputPanel({ outputList }) {
                 {active ? 'REC' : 'IDLE'}
               </span>
             </div>
+            {encoder && <StatRow label="Encoder" value={encoder} status="neutral" />}
+            {bitrate && <StatRow label="Bitrate" value={bitrate} unit=" kbps" status="neutral" />}
+            {resolution && <StatRow label="Resolution" value={resolution} status="neutral" />}
             <StatRow
               label="Written"
               value={formatBytes(output.outputTotalBytes)}
