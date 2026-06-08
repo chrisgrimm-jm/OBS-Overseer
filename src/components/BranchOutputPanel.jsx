@@ -1,5 +1,23 @@
 import React, { useState } from 'react'
 
+function DetailTile({ label, value, borderColor, valueColor, tooltip }) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <div
+      className="branch-detail-tile"
+      style={{ borderLeftColor: borderColor, cursor: tooltip ? 'help' : 'default' }}
+      onMouseEnter={() => tooltip && setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      <span className="branch-detail-label">{label}</span>
+      <span className="branch-detail-value" style={{ color: valueColor, fontSize: value && value.length > 8 ? 11 : undefined }}>
+        {value || '—'}
+      </span>
+      {tooltip && visible && <div className="tooltip">{tooltip}</div>}
+    </div>
+  )
+}
+
 function formatBytes(bytes) {
   if (bytes == null) return '—'
   if (bytes < 1024) return `${bytes} B`
@@ -85,62 +103,20 @@ function OutputDetail({ output }) {
 
   return (
     <div className="branch-detail-grid">
-      {enc && (
-        <div
-          className="branch-detail-tile"
-          style={{ borderLeftColor: enc.isHardware ? 'var(--green)' : 'var(--yellow)' }}
-          title={enc.resourceTooltip}
-        >
-          <span className="branch-detail-label">Encoder</span>
-          <span className="branch-detail-value" style={{ fontSize: 11 }}>{enc.label}</span>
-        </div>
-      )}
-      {enc && (
-        <div
-          className="branch-detail-tile"
-          style={{ borderLeftColor: enc.isHardware ? 'var(--green)' : 'var(--yellow)' }}
-          title={enc.resourceTooltip}
-        >
-          <span className="branch-detail-label">Resources</span>
-          <span className="branch-detail-value" style={{ fontSize: 11, color: enc.isHardware ? 'var(--green)' : 'var(--yellow)' }}>
-            {enc.resourceSummary}
-          </span>
-        </div>
-      )}
-      {bitrate && (
-        <div className="branch-detail-tile" title="Target recording bitrate.">
-          <span className="branch-detail-label">Bitrate</span>
-          <span className="branch-detail-value">{bitrate} kbps</span>
-        </div>
-      )}
-      {resolution && (
-        <div className="branch-detail-tile" title="Output resolution for this branch recording.">
-          <span className="branch-detail-label">Resolution</span>
-          <span className="branch-detail-value" style={{ fontSize: 11 }}>{resolution}</span>
-        </div>
-      )}
-      <div className="branch-detail-tile" title="Total data written to disk for this ISO recording.">
-        <span className="branch-detail-label">Written</span>
-        <span className="branch-detail-value">{formatBytes(output.outputTotalBytes)}</span>
-      </div>
-      <div
-        className="branch-detail-tile"
-        style={{ borderLeftColor: colorMap[dropSt] }}
-        title={`${dropped} frames dropped out of ${total} (${droppedPct}%)\n\nFor local recordings, drops usually mean your drive cannot keep up with the write speed.\n\nTry: recording to an SSD, lowering bitrate, or changing encoder preset.`}
-      >
-        <span className="branch-detail-label">Dropped</span>
-        <span className="branch-detail-value" style={{ color: colorMap[dropSt] }}>
-          {dropped} ({droppedPct}%)
-        </span>
-      </div>
-      <div className="branch-detail-tile" title="Total frames written to this ISO output since recording started.">
-        <span className="branch-detail-label">Frames</span>
-        <span className="branch-detail-value">{total.toLocaleString()}</span>
-      </div>
-      <div className="branch-detail-tile" title="Time elapsed since this ISO recording started.">
-        <span className="branch-detail-label">Duration</span>
-        <span className="branch-detail-value">{duration || '—'}</span>
-      </div>
+      {enc && <DetailTile label="Encoder" value={enc.label} borderColor={enc.isHardware ? 'var(--green)' : 'var(--yellow)'} tooltip={enc.resourceTooltip} />}
+      {enc && <DetailTile label="Resources" value={enc.resourceSummary} borderColor={enc.isHardware ? 'var(--green)' : 'var(--yellow)'} valueColor={enc.isHardware ? 'var(--green)' : 'var(--yellow)'} tooltip={enc.resourceTooltip} />}
+      {bitrate && <DetailTile label="Bitrate" value={`${bitrate} kbps`} tooltip="Target recording bitrate for this branch output." />}
+      {resolution && <DetailTile label="Resolution" value={resolution} tooltip="Output resolution for this branch recording." />}
+      <DetailTile label="Written" value={formatBytes(output.outputTotalBytes)} tooltip="Total data written to disk for this ISO recording." />
+      <DetailTile
+        label="Dropped"
+        value={`${dropped} (${droppedPct}%)`}
+        borderColor={colorMap[dropSt]}
+        valueColor={colorMap[dropSt]}
+        tooltip={`${dropped} frames dropped out of ${total} (${droppedPct}%)\n\nFor local recordings, drops usually mean your drive cannot keep up with the write speed.\n\nTry: recording to an SSD, lowering bitrate, or changing encoder preset.`}
+      />
+      <DetailTile label="Frames" value={total.toLocaleString()} tooltip="Total frames written to this ISO output since recording started." />
+      <DetailTile label="Duration" value={duration} tooltip="Time elapsed since this ISO recording started." />
     </div>
   )
 }

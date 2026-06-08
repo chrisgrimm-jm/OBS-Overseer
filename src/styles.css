@@ -306,6 +306,7 @@ html, body, #root {
 }
 
 .branch-detail-tile {
+  position: relative;
   background: var(--bg3);
   border: 1px solid var(--border);
   border-left: 3px solid var(--gray);
