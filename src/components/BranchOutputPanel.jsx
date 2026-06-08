@@ -69,16 +69,19 @@ export function BranchOutputPanel({ outputList }) {
               label="Written"
               value={formatBytes(output.outputTotalBytes)}
               status={active ? 'green' : 'neutral'}
+              tooltip="Total data written to disk for this ISO recording."
             />
             <StatRow
               label="Dropped Frames"
               value={`${dropped} (${droppedPct}%)`}
               status={active ? droppedStatus(dropped, total) : 'neutral'}
+              tooltip={`${dropped} frames dropped out of ${total} (${droppedPct}%)\n\nFor local recordings, drops usually mean your drive cannot keep up with the write speed.\n\nTry: recording to an SSD, lowering bitrate, or changing encoder preset.`}
             />
             <StatRow
               label="Total Frames"
               value={total.toLocaleString()}
               status="neutral"
+              tooltip="Total frames written to this ISO output since recording started."
             />
           </div>
         )

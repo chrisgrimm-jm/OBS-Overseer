@@ -121,8 +121,29 @@ html, body, #root {
   justify-content: space-between;
   padding: 3px 0;
   border-bottom: 1px solid var(--border);
+  position: relative;
 }
 .stat-row:last-child { border-bottom: none; }
+.stat-row-tip { cursor: help; }
+.stat-row-tip:hover { background: rgba(255,255,255,0.03); border-radius: 3px; }
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #111;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  padding: 7px 9px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text);
+  z-index: 100;
+  pointer-events: none;
+  white-space: pre-wrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+}
 
 .stat-label {
   font-size: 12px;
