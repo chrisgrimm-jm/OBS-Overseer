@@ -27,6 +27,7 @@ export function useOBSConnection() {
   const [stats, setStats] = useState(null)
   const [streamStatus, setStreamStatus] = useState(null)
   const [recordStatus, setRecordStatus] = useState(null)
+  const [outputList, setOutputList] = useState([])
   const [settings, setSettingsState] = useState(loadSettings)
 
   const obsRef = useRef(null)
@@ -46,15 +47,19 @@ export function useOBSConnection() {
   const poll = useCallback(async (obs) => {
     if (!mountedRef.current) return
     try {
-      const [s, stream, record] = await Promise.all([
+      const [s, stream, record, outputs] = await Promise.all([
         obs.call('GetStats'),
         obs.call('GetStreamStatus'),
         obs.call('GetRecordStatus'),
+        obs.call('GetOutputList'),
       ])
       if (!mountedRef.current) return
       setStats(s)
       setStreamStatus(stream)
       setRecordStatus(record)
+      // Filter to branch/ISO outputs — exclude the built-in simple_file_output and adv_file_output
+      const builtIn = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output'])
+      setOutputList((outputs.outputs || []).filter(o => !builtIn.has(o.outputName) && !builtIn.has(o.outputKind)))
     } catch {
       // disconnect handler will fire
     }
@@ -82,6 +87,7 @@ export function useOBSConnection() {
       setStats(null)
       setStreamStatus(null)
       setRecordStatus(null)
+      setOutputList([])
       stopPolling()
       const delay = backoffRef.current
       backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF)
@@ -138,5 +144,5 @@ export function useOBSConnection() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { status, obsVersion, stats, streamStatus, recordStatus, settings, saveSettings, reconnect }
+  return { status, obsVersion, stats, streamStatus, recordStatus, outputList, settings, saveSettings, reconnect }
 }

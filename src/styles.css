@@ -228,3 +228,26 @@ html, body, #root {
   transition: opacity 0.15s;
 }
 .settings-save:hover { opacity: 0.85; }
+
+.branch-output {
+  border-top: 1px solid #333;
+  padding-top: 6px;
+  margin-top: 6px;
+}
+.branch-output:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.branch-output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.branch-output-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.badge-idle { background: #444; color: #aaa; }

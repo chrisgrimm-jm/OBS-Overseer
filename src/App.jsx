@@ -4,6 +4,7 @@ import { StreamPanel } from './components/StreamPanel.jsx'
 import { RecordPanel } from './components/RecordPanel.jsx'
 import { SystemPanel } from './components/SystemPanel.jsx'
 import { SettingsPanel } from './components/SettingsPanel.jsx'
+import { BranchOutputPanel } from './components/BranchOutputPanel.jsx'
 
 function StatusDot({ status }) {
   const colorMap = { connected: 'green', connecting: 'yellow', error: 'red', disconnected: 'gray' }
@@ -17,7 +18,7 @@ function StatusDot({ status }) {
 }
 
 export default function App() {
-  const { status, obsVersion, stats, streamStatus, recordStatus, settings, saveSettings, reconnect } = useOBSConnection()
+  const { status, obsVersion, stats, streamStatus, recordStatus, outputList, settings, saveSettings, reconnect } = useOBSConnection()
 
   function handleSaveSettings(newSettings) {
     saveSettings(newSettings)
@@ -35,6 +36,7 @@ export default function App() {
       <div className="panels">
         <StreamPanel streamStatus={streamStatus} />
         <RecordPanel recordStatus={recordStatus} />
+        <BranchOutputPanel outputList={outputList} />
         <SystemPanel stats={stats} />
       </div>
 
