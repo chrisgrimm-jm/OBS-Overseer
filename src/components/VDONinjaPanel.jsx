@@ -12,9 +12,14 @@ function packetLossTooltip(pct) {
   return `${pct.toFixed(2)}% packet loss on VDO.ninja connection.\n\nHigh packet loss causes video artifacts and freezing.\n\nCauses: weak WiFi, network congestion, distance to peer.\n\nTry: switching guest to wired ethernet, or lowering their video quality.`
 }
 
-// Use the URL as-is — extra params break VDO.ninja's iframe API
 function buildIframeSrc(url) {
-  return url
+  try {
+    const u = new URL(url)
+    if (!u.searchParams.has('showstats')) u.searchParams.set('showstats', '1')
+    return u.toString()
+  } catch {
+    return url
+  }
 }
 
 function extractStats(data) {
@@ -79,7 +84,7 @@ function GuestDetail({ guest }) {
       <iframe
         ref={iframeRef}
         src={iframeSrc}
-        style={{ position: 'fixed', left: '-9999px', top: 0, width: 2, height: 2 }}
+        style={{ width: '100%', height: 160, border: 'none', borderRadius: 4, background: '#000' }}
         allow="autoplay;camera;microphone;fullscreen;picture-in-picture;"
         title={`vdo-${guest.label}`}
       />
