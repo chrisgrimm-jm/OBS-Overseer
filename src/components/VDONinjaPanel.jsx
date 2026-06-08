@@ -79,7 +79,7 @@ function GuestDetail({ guest }) {
       <iframe
         ref={iframeRef}
         src={iframeSrc}
-        style={{ width: '100%', height: 120, border: 'none', borderRadius: 4, background: '#000', display: live ? 'block' : 'block' }}
+        style={{ position: 'fixed', left: '-9999px', top: 0, width: 2, height: 2 }}
         allow="autoplay;camera;microphone;fullscreen;picture-in-picture;"
         title={`vdo-${guest.label}`}
       />
