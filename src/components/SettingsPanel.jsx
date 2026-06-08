@@ -9,8 +9,8 @@ export function SettingsPanel({ settings, onSave }) {
 
   // VDO.ninja guests
   const [vdoGuests, setVdoGuests] = useState(settings.vdoGuests || [])
-  const [newLabel, setNewLabel] = useState('')
   const [newUrl, setNewUrl] = useState('')
+  const [editingLabel, setEditingLabel] = useState(null) // index being renamed
 
   function handleSave(e) {
     e.preventDefault()
@@ -19,15 +19,28 @@ export function SettingsPanel({ settings, onSave }) {
     setTimeout(() => setSaved(false), 2000)
   }
 
+  function labelFromUrl(url) {
+    try {
+      const u = new URL(url)
+      const view = u.searchParams.get('view') || u.searchParams.get('room') || u.pathname.split('/').filter(Boolean).pop()
+      if (view) return view.length > 12 ? view.slice(0, 12) + '…' : view
+    } catch {}
+    return 'Guest'
+  }
+
   function addGuest() {
-    if (!newLabel.trim() || !newUrl.trim()) return
-    setVdoGuests(g => [...g, { label: newLabel.trim(), url: newUrl.trim() }])
-    setNewLabel('')
+    const url = newUrl.trim()
+    if (!url) return
+    setVdoGuests(g => [...g, { label: labelFromUrl(url), url }])
     setNewUrl('')
   }
 
   function removeGuest(i) {
     setVdoGuests(g => g.filter((_, idx) => idx !== i))
+  }
+
+  function renameGuest(i, label) {
+    setVdoGuests(g => g.map((x, idx) => idx === i ? { ...x, label } : x))
   }
 
   return (
@@ -70,28 +83,33 @@ export function SettingsPanel({ settings, onSave }) {
           <div className="settings-section-title">VDO.ninja Guests</div>
           {vdoGuests.map((g, i) => (
             <div key={i} className="vdo-guest-row">
-              <span className="vdo-guest-row-label">{g.label}</span>
+              {editingLabel === i ? (
+                <input
+                  className="settings-input"
+                  style={{ flex: 1, fontSize: 11 }}
+                  defaultValue={g.label}
+                  autoFocus
+                  onBlur={e => { renameGuest(i, e.target.value || g.label); setEditingLabel(null) }}
+                  onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+                />
+              ) : (
+                <span className="vdo-guest-row-label" title="Click to rename" style={{ cursor: 'pointer' }} onClick={() => setEditingLabel(i)}>{g.label}</span>
+              )}
               <span className="vdo-guest-row-url">{g.url}</span>
               <button type="button" className="vdo-guest-remove" onClick={() => removeGuest(i)}>✕</button>
             </div>
           ))}
           {vdoGuests.length === 0 && (
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No guests added</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Paste a VDO.ninja solo link below</div>
           )}
           <div className="vdo-add-row">
             <input
               className="settings-input"
-              placeholder="Label (e.g. Guest 1)"
-              value={newLabel}
-              onChange={e => setNewLabel(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <input
-              className="settings-input"
-              placeholder="https://vdo.ninja/?view=..."
+              placeholder="Paste solo link — https://vdo.ninja/?view=..."
               value={newUrl}
               onChange={e => setNewUrl(e.target.value)}
-              style={{ flex: 2 }}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addGuest() } }}
+              style={{ flex: 1 }}
             />
             <button type="button" className="settings-save" style={{ width: 'auto', padding: '4px 10px' }} onClick={addGuest}>Add</button>
           </div>
