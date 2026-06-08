@@ -26,7 +26,7 @@ function extractStats(data) {
   }
 }
 
-function GuestPanel({ guest }) {
+function GuestDetail({ guest }) {
   const iframeRef = useRef(null)
   const [guestStats, setGuestStats] = useState(null)
   const [live, setLive] = useState(false)
@@ -45,7 +45,6 @@ function GuestPanel({ guest }) {
     }
 
     window.addEventListener('message', handleMessage)
-
     intervalId = setInterval(() => {
       try {
         iframeRef.current?.contentWindow?.postMessage({ getStats: true }, '*')
@@ -59,7 +58,6 @@ function GuestPanel({ guest }) {
   }, [guest.url])
 
   const packetLoss = guestStats?.packetLoss_in_percentage ?? null
-  const dotColor = live ? 'green' : 'gray'
 
   return (
     <div className="vdo-guest">
@@ -70,40 +68,39 @@ function GuestPanel({ guest }) {
         allow="camera;microphone"
         title={`vdo-${guest.label}`}
       />
-      <div className="vdo-guest-header">
-        <span className="vdo-guest-name">{guest.label}</span>
+      <div className="branch-output-header">
+        <span className="branch-output-name">{guest.label}</span>
         <span className={`badge badge-${live ? 'live' : 'off'}`}>{live ? 'LIVE' : 'IDLE'}</span>
       </div>
       {live && guestStats ? (
-        <>
-          <div className="stat-row">
-            <span className="stat-label">Bitrate</span>
-            <span className="stat-value">{guestStats.Bitrate_in_kbps != null ? `${guestStats.Bitrate_in_kbps} kbps` : '—'}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-label">FPS</span>
-            <span className="stat-value">{guestStats.framerate != null ? guestStats.framerate : '—'}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-label">Resolution</span>
-            <span className="stat-value">{guestStats.Resolution || '—'}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-label">Codec</span>
-            <span className="stat-value">{guestStats.video_codec || '—'}</span>
+        <div className="branch-detail-grid">
+          <div className="branch-detail-tile">
+            <span className="branch-detail-label">Bitrate</span>
+            <span className="branch-detail-value">
+              {guestStats.Bitrate_in_kbps != null ? `${guestStats.Bitrate_in_kbps} kbps` : '—'}
+            </span>
           </div>
           <div
-            className="stat-row stat-row-tip"
-            style={{ position: 'relative' }}
+            className="branch-detail-tile"
+            style={{ borderLeftColor: `var(--${packetLossColor(packetLoss)})` }}
             title={packetLossTooltip(packetLoss)}
           >
-            <span className="stat-label">Packet Loss</span>
-            <span className="stat-value">
-              <span className={`dot dot-${packetLossColor(packetLoss)}`} />
+            <span className="branch-detail-label">Packet Loss</span>
+            <span className="branch-detail-value">
               {packetLoss != null ? `${packetLoss.toFixed(2)}%` : '—'}
             </span>
           </div>
-        </>
+          <div className="branch-detail-tile">
+            <span className="branch-detail-label">FPS</span>
+            <span className="branch-detail-value">
+              {guestStats.framerate != null ? guestStats.framerate : '—'}
+            </span>
+          </div>
+          <div className="branch-detail-tile">
+            <span className="branch-detail-label">Resolution</span>
+            <span className="branch-detail-value">{guestStats.Resolution || '—'}</span>
+          </div>
+        </div>
       ) : (
         <div className="panel-idle">Waiting for stats…</div>
       )}
@@ -112,16 +109,29 @@ function GuestPanel({ guest }) {
 }
 
 export function VDONinjaPanel({ settings }) {
+  const [expanded, setExpanded] = useState(false)
   const guests = settings?.vdoGuests || []
 
   if (guests.length === 0) return null
 
   return (
-    <section className="panel">
-      <h2 className="panel-title">VDO.ninja</h2>
-      {guests.map((g, i) => (
-        <GuestPanel key={g.url + i} guest={g} />
-      ))}
+    <section className="panel accordion-panel">
+      <div className="accordion-header" onClick={() => setExpanded(e => !e)}>
+        <span className="panel-title" style={{ marginBottom: 0 }}>
+          VDO.ninja
+          <span className="accordion-arrow">{expanded ? '▾' : '▸'}</span>
+        </span>
+        <div className="accordion-badges">
+          <span className="status-badge status-badge-idle">{guests.length} guest{guests.length !== 1 ? 's' : ''}</span>
+        </div>
+      </div>
+      {expanded && (
+        <div className="accordion-body">
+          {guests.map((g, i) => (
+            <GuestDetail key={g.url + i} guest={g} />
+          ))}
+        </div>
+      )}
     </section>
   )
 }

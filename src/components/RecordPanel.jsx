@@ -1,5 +1,4 @@
 import React from 'react'
-import { StatRow } from './StatRow.jsx'
 
 function formatBytes(bytes) {
   if (bytes == null) return null
@@ -14,31 +13,17 @@ function formatTimecode(tc) {
 }
 
 export function RecordPanel({ recordStatus }) {
-  if (!recordStatus) {
-    return (
-      <section className="panel">
-        <h2 className="panel-title">Record</h2>
-        <div className="panel-idle">Not recording</div>
-      </section>
-    )
-  }
+  // Kept for data access — rendering moved to App.jsx
+  return null
+}
 
+export function getRecordInfo(recordStatus) {
+  if (!recordStatus) return null
   const { outputActive, outputPaused, outputBytes, outputTimecode } = recordStatus
-
-  const size = formatBytes(outputBytes)
-  const duration = formatTimecode(outputTimecode)
-
-  let badge = null
-  if (outputActive && outputPaused) badge = <span className="badge badge-paused">PAUSED</span>
-  else if (outputActive) badge = <span className="badge badge-rec">REC</span>
-  else badge = <span className="badge badge-off">OFF</span>
-
-  return (
-    <section className="panel">
-      <h2 className="panel-title">Record {badge}</h2>
-      {size && <StatRow label="Size" value={size} color={outputActive ? 'green' : 'gray'} />}
-      {duration && <StatRow label="Duration" value={duration} color="gray" />}
-      {!outputActive && <div className="panel-idle">Not recording</div>}
-    </section>
-  )
+  return {
+    outputActive,
+    outputPaused,
+    size: formatBytes(outputBytes),
+    duration: formatTimecode(outputTimecode),
+  }
 }

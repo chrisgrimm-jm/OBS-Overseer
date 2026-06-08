@@ -1,5 +1,5 @@
 import React from 'react'
-import { StatRow } from './StatRow.jsx'
+import { StatTile } from './StatTile.jsx'
 
 function bitrateColor(kbps) {
   if (kbps == null) return 'gray'
@@ -13,11 +13,6 @@ function droppedColor(pct) {
   if (pct <= 0) return 'green'
   if (pct < 2) return 'yellow'
   return 'red'
-}
-
-function formatTimecode(tc) {
-  if (!tc) return null
-  return tc.split('.')[0]
 }
 
 function bitrateTooltip(kbps) {
@@ -40,35 +35,45 @@ function droppedTooltip(pct, skipped, total) {
   return `${skipped ?? 0} frames dropped out of ${total ?? 0} (${pct.toFixed(2)}%)\n\nThresholds: 0% good · <2% warning · ≥2% critical\n\n${advice}`
 }
 
-export function StreamPanel({ streamStatus }) {
-  if (!streamStatus) {
-    return (
-      <section className="panel">
-        <h2 className="panel-title">Stream</h2>
-        <div className="panel-idle">Not streaming</div>
-      </section>
-    )
-  }
-
-  const { outputActive, outputBytes, outputTotalFrames, outputSkippedFrames, outputTimecode } = streamStatus
-
+// Exported for use in App.jsx alert bar
+export function getStreamAlerts(streamStatus) {
+  if (!streamStatus?.outputActive) return []
+  const alerts = []
+  const { outputBytes, outputTotalFrames, outputSkippedFrames } = streamStatus
   const kbps = outputBytes != null ? Math.round((outputBytes * 8) / 1000) : null
   const droppedPct = (outputTotalFrames && outputSkippedFrames != null)
     ? parseFloat(((outputSkippedFrames / outputTotalFrames) * 100).toFixed(1))
     : null
-  const duration = formatTimecode(outputTimecode)
+  if (kbps != null && bitrateColor(kbps) === 'red') alerts.push(`Bitrate ${kbps}kbps`)
+  if (droppedPct != null && droppedColor(droppedPct) === 'red') alerts.push(`Dropped ${droppedPct}%`)
+  return alerts
+}
 
+export function getStreamTiles(streamStatus) {
+  if (!streamStatus) return { bitrateTile: null, droppedTile: null }
+  const { outputBytes, outputTotalFrames, outputSkippedFrames } = streamStatus
+  const kbps = outputBytes != null ? Math.round((outputBytes * 8) / 1000) : null
+  const droppedPct = (outputTotalFrames && outputSkippedFrames != null)
+    ? parseFloat(((outputSkippedFrames / outputTotalFrames) * 100).toFixed(1))
+    : null
+  return {
+    kbps,
+    droppedPct,
+    kbpsColor: bitrateColor(kbps),
+    droppedColor: droppedColor(droppedPct),
+    bitrateTooltip: bitrateTooltip(kbps),
+    droppedTooltip: droppedTooltip(droppedPct, outputSkippedFrames, outputTotalFrames),
+  }
+}
+
+export function StreamPanel({ streamStatus }) {
+  // Kept for backwards compat but not used in new layout
+  if (!streamStatus) return null
+  const { kbps, droppedPct, kbpsColor, droppedColor: dColor, bitrateTooltip: btt, droppedTooltip: dtt } = getStreamTiles(streamStatus)
   return (
-    <section className="panel">
-      <h2 className="panel-title">
-        Stream
-        {outputActive
-          ? <span className="badge badge-live">LIVE</span>
-          : <span className="badge badge-off">OFF</span>}
-      </h2>
-      <StatRow label="Bitrate" value={kbps} unit=" kbps" color={bitrateColor(kbps)} tooltip={bitrateTooltip(kbps)} />
-      <StatRow label="Dropped" value={droppedPct} unit="%" color={droppedColor(droppedPct)} tooltip={droppedTooltip(droppedPct, outputSkippedFrames, outputTotalFrames)} />
-      {duration && <StatRow label="Duration" value={duration} color="gray" tooltip="Time elapsed since stream started." />}
-    </section>
+    <>
+      <StatTile label="Bitrate" value={kbps} unit=" kbps" color={kbpsColor} tooltip={btt} />
+      <StatTile label="Dropped" value={droppedPct} unit="%" color={dColor} tooltip={dtt} />
+    </>
   )
 }
