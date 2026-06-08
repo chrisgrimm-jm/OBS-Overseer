@@ -133,7 +133,7 @@ html, body, #root {
 /* ── Stat grid ── */
 .stat-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 4px;
 }
 
@@ -144,8 +144,8 @@ html, body, #root {
   border: 1px solid var(--border);
   border-left: 3px solid var(--gray);
   border-radius: 4px;
-  padding: 5px 8px;
-  min-height: 50px;
+  padding: 5px 6px;
+  min-height: 46px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -169,7 +169,7 @@ html, body, #root {
 }
 
 .stat-tile-value {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text);
