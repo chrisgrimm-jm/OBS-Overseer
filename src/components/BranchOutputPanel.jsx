@@ -53,6 +53,7 @@ export function BranchOutputPanel({ outputList }) {
         const width = output.outputWidth || s.width || null
         const height = output.outputHeight || s.height || null
         const resolution = (width && height) ? `${width}×${height}` : null
+        const duration = output.outputTimecode ? output.outputTimecode.split('.')[0] : null
 
         return (
           <div key={output.outputName} className="branch-output">
@@ -65,6 +66,7 @@ export function BranchOutputPanel({ outputList }) {
             {encoder && <StatRow label="Encoder" value={encoder} status="neutral" />}
             {bitrate && <StatRow label="Bitrate" value={bitrate} unit=" kbps" status="neutral" />}
             {resolution && <StatRow label="Resolution" value={resolution} status="neutral" />}
+            {duration && <StatRow label="Duration" value={duration} status="neutral" tooltip="Time elapsed since this ISO recording started." />}
             <StatRow
               label="Written"
               value={formatBytes(output.outputTotalBytes)}

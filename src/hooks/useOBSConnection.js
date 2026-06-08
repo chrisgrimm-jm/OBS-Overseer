@@ -65,18 +65,25 @@ export function useOBSConnection() {
         !excludedKinds.has(o.outputName) &&
         !excludedNamePatterns.test(o.outputName)
       )
-      // Fetch settings for each branch output to get encoder info
-      const withSettings = await Promise.all(
+      // Fetch settings + status for each branch output
+      const withDetails = await Promise.all(
         branchOutputs.map(async o => {
-          try {
-            const s = await obs.call('GetOutputSettings', { outputName: o.outputName })
-            return { ...o, settings: s.outputSettings || {} }
-          } catch {
-            return { ...o, settings: {} }
+          const [settingsRes, statusRes] = await Promise.all([
+            obs.call('GetOutputSettings', { outputName: o.outputName }).catch(() => ({ outputSettings: {} })),
+            obs.call('GetOutputStatus', { outputName: o.outputName }).catch(() => ({})),
+          ])
+          return {
+            ...o,
+            settings: settingsRes.outputSettings || {},
+            // GetOutputStatus uses different field names than GetOutputList
+            outputTotalBytes: statusRes.outputBytes ?? o.outputTotalBytes ?? 0,
+            outputTotalFrames: statusRes.outputTotalFrames ?? o.outputTotalFrames ?? 0,
+            outputDroppedFrames: statusRes.outputSkippedFrames ?? o.outputDroppedFrames ?? 0,
+            outputTimecode: statusRes.outputTimecode ?? null,
           }
         })
       )
-      setOutputList(withSettings)
+      setOutputList(withDetails)
     } catch {
       // disconnect handler will fire
     }
