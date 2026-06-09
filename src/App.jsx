@@ -103,14 +103,14 @@ export default function App() {
         />
         {/* Row 2: CPU | Memory */}
         <StatTile
-          label="CPU"
+          label="OBS CPU"
           value={sysTiles?.cpu}
           unit="%"
           color={sysTiles?.cpuColor || 'gray'}
           tooltip={sysTiles?.cpuTooltip}
         />
         <StatTile
-          label="Memory"
+          label="OBS RAM"
           value={sysTiles?.mem}
           unit=" MB"
           color={sysTiles?.memColor || 'gray'}

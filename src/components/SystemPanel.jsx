@@ -50,7 +50,7 @@ function memTooltip(mb) {
     : mb >= 512
     ? 'Memory usage is moderately elevated. Keep an eye on it during long streams.'
     : 'Memory usage is normal.'
-  return `${status}: ${mb.toFixed(0)} MB used by OBS\n\nThresholds: <512 MB good · 512–1024 MB warning · >1024 MB critical\n\n${advice}`
+  return `OBS process memory: ${mb.toFixed(0)} MB\n\nThis is RAM used by OBS only — not your whole system. Your total system memory usage will be higher.\n\nThresholds: <512 MB good · 512–1024 MB warning · >1024 MB critical\n\n${advice}`
 }
 
 function cpuTooltip(pct) {
@@ -60,7 +60,7 @@ function cpuTooltip(pct) {
     : pct >= 50
     ? 'CPU load is moderate. Monitor for spikes during busy scenes.'
     : 'CPU usage is normal.'
-  return `${pct.toFixed(1)}% CPU used by OBS\n\nThresholds: <50% good · 50–80% warning · >80% critical\n\n${advice}`
+  return `OBS process CPU: ${pct.toFixed(1)}%\n\nThis is CPU used by OBS only — not your whole system. Your total system CPU usage will be higher.\n\nThresholds: <50% good · 50–80% warning · >80% critical\n\n${advice}`
 }
 
 function renderLagTooltip(pct) {
