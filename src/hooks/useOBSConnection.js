@@ -30,6 +30,7 @@ export function useOBSConnection() {
   const [recordStatus, setRecordStatus] = useState(null)
   const [outputList, setOutputList] = useState([])
   const [audioInputs, setAudioInputs] = useState([])
+  const [encoders, setEncoders] = useState({ stream: null, record: null })
   const [settings, setSettingsState] = useState(loadSettings)
 
   const obsRef = useRef(null)
@@ -39,6 +40,12 @@ export function useOBSConnection() {
   const backoffRef = useRef(1000)
   const mountedRef = useRef(true)
   const connectRef = useRef(null)
+  // Baseline for encode lag delta — reset on each connect so we only show current-session lag
+  const encodeLagBaseRef = useRef(null)
+  // Previous poll's skipped/total frames to detect active skipping between polls
+  const prevStatsRef = useRef(null)
+  // Previous bytes + timestamp per output for live bitrate calculation
+  const outputBytesRef = useRef({})
 
   const AUDIO_INPUT_KINDS = new Set([
     'wasapi_input_capture', 'wasapi_output_capture',
@@ -67,7 +74,38 @@ export function useOBSConnection() {
         obs.call('GetOutputList'),
       ])
       if (!mountedRef.current) return
-      setStats(s)
+      // Set baseline on first poll so encode lag is relative to this session only
+      if (encodeLagBaseRef.current === null) {
+        encodeLagBaseRef.current = {
+          skipped: s.outputSkippedFrames ?? 0,
+          total: s.outputTotalFrames ?? 0,
+        }
+      }
+      const base = encodeLagBaseRef.current
+      const deltaTotal = (s.outputTotalFrames ?? 0) - base.total
+      const deltaSkipped = (s.outputSkippedFrames ?? 0) - base.skipped
+      // Calculate poll-to-poll skipped rate (frames skipped since last poll)
+      const prev = prevStatsRef.current
+      let pollSkippedRate = null
+      if (prev) {
+        const pollSkipped = (s.outputSkippedFrames ?? 0) - prev.skipped
+        const pollTotal = (s.outputTotalFrames ?? 0) - prev.total
+        if (pollTotal > 0 && pollSkipped > 0) {
+          pollSkippedRate = (pollSkipped / pollTotal) * 100
+        }
+      }
+      prevStatsRef.current = {
+        skipped: s.outputSkippedFrames ?? 0,
+        total: s.outputTotalFrames ?? 0,
+      }
+
+      const sessionStats = {
+        ...s,
+        outputSkippedFrames: Math.max(0, deltaSkipped),
+        outputTotalFrames: Math.max(0, deltaTotal),
+        pollSkippedRate, // rate of skipping in the most recent poll interval
+      }
+      setStats(sessionStats)
       setStreamStatus(stream)
       setRecordStatus(record)
       // Filter to branch/ISO outputs only — exclude built-in, replay buffer, virtual cam, vertical backtrack
@@ -78,6 +116,23 @@ export function useOBSConnection() {
         !excludedKinds.has(o.outputName) &&
         !excludedNamePatterns.test(o.outputName)
       )
+      // Get stream + record encoders from OBS profile
+      let profileRecEncoder = null
+      let profileStreamEncoder = null
+      try {
+        const [advRec, advStream, simRec, simStream] = await Promise.all([
+          obs.call('GetProfileParameter', { parameterCategory: 'AdvOut', parameterName: 'RecEncoder' }).catch(() => null),
+          obs.call('GetProfileParameter', { parameterCategory: 'AdvOut', parameterName: 'Encoder' }).catch(() => null),
+          obs.call('GetProfileParameter', { parameterCategory: 'SimpleOutput', parameterName: 'RecEncoder' }).catch(() => null),
+          obs.call('GetProfileParameter', { parameterCategory: 'SimpleOutput', parameterName: 'StreamEncoder' }).catch(() => null),
+        ])
+        profileRecEncoder = advRec?.parameterValue || simRec?.parameterValue || null
+        profileStreamEncoder = advStream?.parameterValue || simStream?.parameterValue || null
+      } catch {}
+      setEncoders({ stream: profileStreamEncoder, record: profileRecEncoder })
+
+      const now = Date.now()
+
       // Fetch settings + status for each branch output
       const withDetails = await Promise.all(
         branchOutputs.map(async o => {
@@ -85,14 +140,35 @@ export function useOBSConnection() {
             obs.call('GetOutputSettings', { outputName: o.outputName }).catch(() => ({ outputSettings: {} })),
             obs.call('GetOutputStatus', { outputName: o.outputName }).catch(() => ({})),
           ])
+          const active = statusRes.outputActive ?? o.outputActive ?? false
+          const totalBytes = statusRes.outputBytes ?? 0
+
+          // Calculate live bitrate from bytes delta
+          let liveBitrateKbps = null
+          if (active) {
+            const prev = outputBytesRef.current[o.outputName]
+            if (prev && prev.bytes != null) {
+              const deltaBytes = totalBytes - prev.bytes
+              const deltaSec = (now - prev.time) / 1000
+              if (deltaSec > 0 && deltaBytes >= 0) {
+                liveBitrateKbps = Math.round((deltaBytes * 8) / deltaSec / 1000)
+              }
+            }
+            outputBytesRef.current[o.outputName] = { bytes: totalBytes, time: now }
+          } else {
+            delete outputBytesRef.current[o.outputName]
+          }
+
           return {
             ...o,
-            settings: settingsRes.outputSettings || {},
-            // GetOutputStatus uses different field names than GetOutputList
-            outputTotalBytes: statusRes.outputBytes ?? o.outputTotalBytes ?? 0,
+            settings: { ...(settingsRes.outputSettings || {}), _profileEncoder: profileRecEncoder },
+            outputActive: active,
+            outputTotalBytes: totalBytes,
             outputTotalFrames: statusRes.outputTotalFrames ?? o.outputTotalFrames ?? 0,
-            outputDroppedFrames: statusRes.outputSkippedFrames ?? o.outputDroppedFrames ?? 0,
+            outputSkippedFrames: active ? (statusRes.outputSkippedFrames ?? 0) : 0,
+            outputCongestion: statusRes.outputCongestion ?? null,
             outputTimecode: statusRes.outputTimecode ?? null,
+            liveBitrateKbps,
           }
         })
       )
@@ -158,6 +234,8 @@ export function useOBSConnection() {
       const { obsVersion: ver } = await obs.connect(url, s.password || undefined)
       if (!mountedRef.current) return
       backoffRef.current = 1000
+      encodeLagBaseRef.current = null  // reset so first poll sets a fresh baseline
+      prevStatsRef.current = null
       setObsVersion(ver)
       setStatus('connected')
       poll(obs)
@@ -225,5 +303,5 @@ export function useOBSConnection() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, settings, saveSettings, reconnect }
+  return { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, encoders, settings, saveSettings, reconnect }
 }

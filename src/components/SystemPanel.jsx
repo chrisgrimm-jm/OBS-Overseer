@@ -10,8 +10,8 @@ function cpuColor(pct) {
 
 function memColor(mb) {
   if (mb == null) return 'gray'
-  if (mb < 512) return 'green'
-  if (mb < 1024) return 'yellow'
+  if (mb < 4096) return 'green'
+  if (mb < 8192) return 'yellow'
   return 'red'
 }
 
@@ -44,13 +44,12 @@ function diskTooltip(mb) {
 
 function memTooltip(mb) {
   if (mb == null) return null
-  const status = mb < 512 ? 'Normal' : mb < 1024 ? 'Elevated' : 'High'
-  const advice = mb >= 1024
-    ? 'OBS is using a large amount of RAM. This can lead to stuttering or crashes.\n\nTry: closing unused browser sources, reducing scene complexity, or restarting OBS to clear memory leaks.'
-    : mb >= 512
-    ? 'Memory usage is moderately elevated. Keep an eye on it during long streams.'
-    : 'Memory usage is normal.'
-  return `OBS process memory: ${mb.toFixed(0)} MB\n\nThis is RAM used by OBS only — not your whole system. Your total system memory usage will be higher.\n\nThresholds: <512 MB good · 512–1024 MB warning · >1024 MB critical\n\n${advice}`
+  const advice = mb >= 8192
+    ? 'OBS is using a very large amount of RAM. With multiple software encoders this is expected, but watch for continued growth which can indicate a memory leak.\n\nTry: restarting OBS between shows, closing unused browser sources, or switching to hardware encoders (NVENC/AMF/Apple VT).'
+    : mb >= 4096
+    ? 'Memory usage is elevated. Normal for multi-output software encoding setups — monitor for growth over long sessions.'
+    : 'Memory usage is normal. Plenty of headroom on a 32 GB system.'
+  return `OBS process memory: ${(mb / 1024).toFixed(2)} GB (${mb.toFixed(0)} MB)\n\nThis is RAM used by OBS only — not your whole system.\n\nThresholds (tuned for 32 GB systems): <4 GB good · 4–8 GB warning · >8 GB critical\n\n${advice}`
 }
 
 function cpuTooltip(pct) {
@@ -104,7 +103,7 @@ export function getSystemTiles(stats) {
     cpu: cpuUsage != null ? cpuUsage.toFixed(1) : null,
     cpuColor: cpuColor(cpuUsage),
     cpuTooltip: cpuTooltip(cpuUsage),
-    mem: memoryUsage != null ? memoryUsage.toFixed(0) : null,
+    mem: memoryUsage != null ? (memoryUsage / 1024).toFixed(2) : null,
     memColor: memColor(memoryUsage),
     memTooltip: memTooltip(memoryUsage),
     fps: activeFps != null ? activeFps.toFixed(2) : null,
@@ -131,7 +130,6 @@ export function getSystemAlerts(stats) {
   if (t.diskColor === 'red') alerts.push(`Disk ${t.diskFree}GB`)
   if (t.fpsColor === 'red') alerts.push(`FPS ${t.fps}`)
   if (t.renderLagColor === 'red') alerts.push(`Render ${t.renderLag}%`)
-  if (t.encodeLagColor === 'red') alerts.push(`Encode ${t.encodeLag}%`)
   return alerts
 }
 

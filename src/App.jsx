@@ -25,22 +25,45 @@ function formatTimecode(tc) {
 }
 
 export default function App() {
-  const { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, settings, saveSettings, reconnect } = useOBSConnection()
+  const { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, encoders, settings, saveSettings, reconnect } = useOBSConnection()
 
   function handleSaveSettings(newSettings) {
     saveSettings(newSettings)
     reconnect()
   }
 
-  // Alert bar: collect all red-state stats
-  const streamAlerts = getStreamAlerts(streamStatus)
-  const sysAlerts = getSystemAlerts(stats)
-  const allAlerts = [...streamAlerts, ...sysAlerts]
-
-  // Stream tiles data
+  // Derived data — must be declared before alerts
   const streamTiles = getStreamTiles(streamStatus)
   const sysTiles = getSystemTiles(stats)
   const recInfo = getRecordInfo(recordStatus)
+
+  // Alert bar: collect all red-state stats
+  const streamAlerts = getStreamAlerts(streamStatus)
+  const sysAlerts = getSystemAlerts(stats)
+
+  // Encoder overload alerts — use poll-to-poll rate so it fires while overload is actively happening
+  const activeOutputCount = (outputList || []).filter(o => o.outputActive).length
+  const pollSkippedRate = stats?.pollSkippedRate ?? null
+  const encodeAlerts = []
+  if (pollSkippedRate != null && pollSkippedRate >= 0.5) {
+    encodeAlerts.push(`ENCODER OVERLOAD — ${pollSkippedRate.toFixed(1)}% frames skipped`)
+  }
+
+  // CPU alert when software outputs are active
+  const cpuPct = stats?.cpuUsage ?? null
+  if (cpuPct != null && cpuPct >= 80 && activeOutputCount > 0) {
+    encodeAlerts.push(`HIGH CPU ${cpuPct.toFixed(1)}% — ${activeOutputCount} output${activeOutputCount > 1 ? 's' : ''} recording`)
+  }
+
+  // Congestion alerts per output (if OBS does return it)
+  const congestionAlerts = (outputList || []).flatMap(o => {
+    if (!o.outputActive) return []
+    const congestion = o.outputCongestion ?? null
+    if (congestion != null && congestion >= 0.6) return [`${o.outputName} congestion ${(congestion * 100).toFixed(0)}%`]
+    return []
+  })
+
+  const allAlerts = [...streamAlerts, ...sysAlerts, ...encodeAlerts, ...congestionAlerts]
 
   // Status badges for stream + record
   const streamActive = streamStatus?.outputActive
@@ -112,7 +135,7 @@ export default function App() {
         <StatTile
           label="OBS RAM"
           value={sysTiles?.mem}
-          unit=" MB"
+          unit=" GB"
           color={sysTiles?.memColor || 'gray'}
           tooltip={sysTiles?.memTooltip}
         />
@@ -130,7 +153,7 @@ export default function App() {
           color={sysTiles?.fpsColor || 'gray'}
           tooltip={sysTiles?.fpsTooltip}
         />
-        {/* Row 4: Render Lag | Encode Lag */}
+        {/* Row 4: Render Lag | Encode Lag | (empty) */}
         <StatTile
           label="Render Lag"
           value={sysTiles?.renderLag}
@@ -140,9 +163,15 @@ export default function App() {
         />
         <StatTile
           label="Encode Lag"
-          value={sysTiles?.encodeLag}
+          value={pollSkippedRate != null && pollSkippedRate > 0 ? pollSkippedRate.toFixed(2) : sysTiles?.encodeLag}
           unit="%"
-          color={sysTiles?.encodeLagColor || 'gray'}
+          color={(() => {
+            const pct = pollSkippedRate != null && pollSkippedRate > 0 ? pollSkippedRate : parseFloat(sysTiles?.encodeLag)
+            if (pct == null || isNaN(pct)) return 'gray'
+            if (pct <= 0) return 'green'
+            if (pct < 1) return 'yellow'
+            return 'red'
+          })()}
           tooltip={sysTiles?.encodeLagTooltip}
         />
       </div>

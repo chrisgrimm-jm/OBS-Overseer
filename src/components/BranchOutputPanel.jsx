@@ -36,8 +36,17 @@ function droppedStatus(dropped, total) {
 
 // Returns { label, isHardware, preset, resourceSummary, resourceTooltip }
 function encoderInfo(settings) {
-  const enc = settings?.encoder || settings?.video_encoder || settings?.['video-encoder'] || ''
-  if (!enc) return null
+  // Branch outputs don't store their encoder in output settings —
+  // we inject _profileEncoder from the OBS profile (AdvOut/SimpleOutput RecEncoder)
+  const enc = settings?._profileEncoder
+    || settings?.encoder
+    || settings?.video_encoder
+    || settings?.['video-encoder']
+    || settings?.videoEncoder
+    || ''
+  if (!enc) {
+    return { label: 'Unknown', isHardware: false, preset: null, resourceSummary: 'Unknown', resourceTooltip: `Could not detect encoder type.\n\nOBS did not return an encoder ID for this output. Check your Recording encoder in OBS Settings → Output.` }
+  }
 
   const hwEncoders = {
     'jim_nvenc':                                      { label: 'NVENC H.264',      hw: true,  brand: 'NVIDIA GPU' },
@@ -74,49 +83,90 @@ function encoderInfo(settings) {
   }
 
   let resourceSummary, resourceTooltip
+  const profileNote = `\n\n⚠ This reflects your profile's default recording encoder.\nIf this branch output uses a different encoder, OBS WebSocket does not expose per-output overrides — verify in OBS Settings → Output.`
+
   if (info.hw) {
     resourceSummary = `HW · ${info.brand}`
-    resourceTooltip = `Hardware encoder (${info.brand})\n\nUses dedicated encode hardware — minimal CPU impact, typically <2% CPU overhead.\n\nBest for recording high bitrate ISO files without affecting stream performance.`
+    resourceTooltip = `Hardware encoder (${info.brand})\n\nUses dedicated encode hardware — minimal CPU impact, typically <2% CPU overhead.\n\nBest for recording high bitrate ISO files without affecting stream performance.${profileNote}`
   } else {
-    const impact = (preset && x264PresetImpact[preset.toLowerCase()]) || 'Moderate CPU'
     resourceSummary = `SW · ${preset || 'CPU'}`
-    resourceTooltip = `Software encoder (${info.brand})\n\n${preset ? `Preset: ${preset}\n${x264PresetImpact[preset.toLowerCase()] || 'Unknown CPU impact'}\n\n` : ''}Software encoders compete with OBS rendering for CPU time.\n\nFor ISO recording, consider switching to a hardware encoder (NVENC/AMF/Apple VT) to reduce CPU load.`
+    resourceTooltip = `Software encoder (${info.brand})\n\n${preset ? `Preset: ${preset}\n${x264PresetImpact[preset.toLowerCase()] || 'Unknown CPU impact'}\n\n` : ''}Software encoders compete with OBS rendering for CPU time.\n\nFor ISO recording, consider switching to a hardware encoder (NVENC/AMF/Apple VT) to reduce CPU load.${profileNote}`
   }
 
   return { label: info.label, isHardware: info.hw, preset, resourceSummary, resourceTooltip }
 }
 
+function encodeLagColor(pct) {
+  if (pct == null) return 'var(--text-dim)'
+  if (pct <= 0) return 'var(--green)'
+  if (pct < 1) return 'var(--yellow)'
+  return 'var(--red)'
+}
+
+function encodeLagBorder(pct) {
+  if (pct == null) return undefined
+  if (pct <= 0) return 'var(--green)'
+  if (pct < 1) return 'var(--yellow)'
+  return 'var(--red)'
+}
+
+function congestionColor(val) {
+  if (val == null) return 'var(--text-dim)'
+  if (val < 0.25) return 'var(--green)'
+  if (val < 0.6) return 'var(--yellow)'
+  return 'var(--red)'
+}
+
 function OutputDetail({ output }) {
   const active = output.outputActive
-  const dropped = output.outputDroppedFrames ?? 0
+  const skipped = output.outputSkippedFrames ?? 0
   const total = output.outputTotalFrames ?? 0
-  const droppedPct = total > 0 ? ((dropped / total) * 100).toFixed(2) : '0.00'
+  const skippedPct = total > 0 ? parseFloat(((skipped / total) * 100).toFixed(2)) : 0
   const s = output.settings || {}
   const duration = output.outputTimecode ? output.outputTimecode.split('.')[0] : null
-  const dropSt = active ? droppedStatus(dropped, total) : 'neutral'
-  const colorMap = { green: 'var(--green)', yellow: 'var(--yellow)', red: 'var(--red)', neutral: 'var(--text-dim)' }
-  const enc = encoderInfo(s)
-  const bitrate = s.bitrate || s.videoBitrate || s.video_bitrate || null
   const width = output.outputWidth || s.width || null
   const height = output.outputHeight || s.height || null
   const resolution = (width && height) ? `${width}×${height}` : null
+  const liveBitrate = output.liveBitrateKbps
+  const congestion = output.outputCongestion ?? null
+
+  const lagAdvice = skippedPct >= 2
+    ? `The encoder cannot keep up with the recording demand.\n\nTry: switching to a hardware encoder (NVENC/AMF/Apple VT), lowering the bitrate, or using a faster preset.`
+    : skippedPct >= 0.5
+    ? `Minor encoder lag — watch for increases during heavy scenes.`
+    : `Encoder is keeping up. No lag detected.`
 
   return (
     <div className="branch-detail-grid">
-      {enc && <DetailTile label="Encoder" value={enc.label} borderColor={enc.isHardware ? 'var(--green)' : 'var(--yellow)'} tooltip={enc.resourceTooltip} />}
-      {enc && <DetailTile label="Resources" value={enc.resourceSummary} borderColor={enc.isHardware ? 'var(--green)' : 'var(--yellow)'} valueColor={enc.isHardware ? 'var(--green)' : 'var(--yellow)'} tooltip={enc.resourceTooltip} />}
-      {bitrate && <DetailTile label="Bitrate" value={`${bitrate} kbps`} tooltip="Target recording bitrate for this branch output." />}
+      <DetailTile
+        label="Encode Lag"
+        value={active ? `${skippedPct.toFixed(2)}%` : '—'}
+        borderColor={active ? encodeLagBorder(skippedPct) : undefined}
+        valueColor={active ? encodeLagColor(skippedPct) : 'var(--text-dim)'}
+        tooltip={active
+          ? `${skipped} frames skipped out of ${total} (${skippedPct.toFixed(2)}%)\n\nEncoder lag means the encoder couldn't process frames fast enough and had to drop them.\n\nThresholds: 0% great · <1% warning · ≥1% critical\n\n${lagAdvice}`
+          : 'Output not currently recording.'}
+      />
+      <DetailTile
+        label="Bitrate"
+        value={active && liveBitrate != null ? `${liveBitrate} kbps` : '—'}
+        tooltip={active
+          ? `Live bitrate calculated from bytes written over the last poll interval.\n\nThis reflects actual encoder output, not the target bitrate setting.\n\nDrops below target can indicate the encoder is struggling or the drive can't keep up.`
+          : 'Output not currently recording.'}
+      />
+      <DetailTile
+        label="Congestion"
+        value={active && congestion != null ? `${(congestion * 100).toFixed(0)}%` : '—'}
+        valueColor={active ? congestionColor(congestion) : 'var(--text-dim)'}
+        borderColor={active ? congestionColor(congestion) : undefined}
+        tooltip={active
+          ? `Encoder queue congestion: ${congestion != null ? (congestion * 100).toFixed(0) : '—'}%\n\nReflects how backed up the encoder's internal frame queue is. High congestion means frames are piling up faster than the encoder can process them.\n\nThresholds: <25% good · 25–60% warning · >60% critical\n\nFor software encoders, high congestion usually means the CPU preset is too slow for the frame rate.`
+          : 'Output not currently recording.'}
+      />
       {resolution && <DetailTile label="Resolution" value={resolution} tooltip="Output resolution for this branch recording." />}
       <DetailTile label="Written" value={formatBytes(output.outputTotalBytes)} tooltip="Total data written to disk for this ISO recording." />
-      <DetailTile
-        label="Dropped"
-        value={`${dropped} (${droppedPct}%)`}
-        borderColor={colorMap[dropSt]}
-        valueColor={colorMap[dropSt]}
-        tooltip={`${dropped} frames dropped out of ${total} (${droppedPct}%)\n\nFor local recordings, drops usually mean your drive cannot keep up with the write speed.\n\nTry: recording to an SSD, lowering bitrate, or changing encoder preset.`}
-      />
-      <DetailTile label="Frames" value={total.toLocaleString()} tooltip="Total frames written to this ISO output since recording started." />
-      <DetailTile label="Duration" value={duration} tooltip="Time elapsed since this ISO recording started." />
+      <DetailTile label="Frames" value={total > 0 ? total.toLocaleString() : '—'} tooltip="Total frames written to this ISO output since recording started." />
+      <DetailTile label="Duration" value={duration || '—'} tooltip="Time elapsed since this ISO recording started." />
     </div>
   )
 }
