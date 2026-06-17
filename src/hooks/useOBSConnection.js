@@ -292,6 +292,10 @@ export function useOBSConnection() {
     connect()
   }, [connect])
 
+  const refreshOutputs = useCallback(() => {
+    if (obsRef.current) poll(obsRef.current)
+  }, [poll])
+
   useEffect(() => {
     mountedRef.current = true
     connect()
@@ -303,5 +307,5 @@ export function useOBSConnection() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, encoders, settings, saveSettings, reconnect }
+  return { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, encoders, settings, saveSettings, reconnect, refreshOutputs }
 }

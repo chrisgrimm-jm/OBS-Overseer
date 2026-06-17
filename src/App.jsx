@@ -25,7 +25,7 @@ function formatTimecode(tc) {
 }
 
 export default function App() {
-  const { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, encoders, settings, saveSettings, reconnect } = useOBSConnection()
+  const { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, encoders, settings, saveSettings, reconnect, refreshOutputs } = useOBSConnection()
 
   function handleSaveSettings(newSettings) {
     saveSettings(newSettings)
@@ -177,7 +177,7 @@ export default function App() {
       </div>
 
       {/* Branch outputs accordion */}
-      <BranchOutputPanel outputList={outputList} />
+      <BranchOutputPanel outputList={outputList} onRefresh={refreshOutputs} />
 
       {/* Audio compact chips */}
       <AudioPanel audioInputs={audioInputs} />

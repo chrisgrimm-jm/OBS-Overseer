@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 
 function DetailTile({ label, value, borderColor, valueColor, tooltip }) {
   const [visible, setVisible] = useState(false)
@@ -171,17 +171,56 @@ function OutputDetail({ output }) {
   )
 }
 
-export function BranchOutputPanel({ outputList }) {
+export function BranchOutputPanel({ outputList, onRefresh }) {
   const [expanded, setExpanded] = useState(false)
+  const [spinning, setSpinning] = useState(false)
+
+  const handleRefresh = useCallback((e) => {
+    e.stopPropagation()
+    if (spinning) return
+    setSpinning(true)
+    onRefresh?.()
+    setTimeout(() => setSpinning(false), 800)
+  }, [spinning, onRefresh])
 
   if (!outputList || outputList.length === 0) return null
 
   return (
     <div className="panel accordion-panel">
       <div className="accordion-header" onClick={() => setExpanded(e => !e)}>
-        <span className="panel-title" style={{ marginBottom: 0 }}>
+        <span className="panel-title" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           Branch Outputs
           <span className="accordion-arrow">{expanded ? '▾' : '▸'}</span>
+          <button
+            onClick={handleRefresh}
+            title="Refresh output list"
+            style={{
+              background: 'none',
+              border: '1px solid var(--border)',
+              borderRadius: 4,
+              color: 'var(--text-dim)',
+              cursor: 'pointer',
+              padding: '2px 7px',
+              fontSize: 10,
+              fontFamily: 'inherit',
+              fontWeight: 600,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              opacity: spinning ? 0.5 : 1,
+              transition: 'opacity 0.15s',
+            }}
+          >
+            <svg
+              width="10" height="10" viewBox="0 0 12 12" fill="none"
+              style={{ animation: spinning ? 'branch-spin 0.6s linear infinite' : 'none' }}
+            >
+              <path d="M10.5 6a4.5 4.5 0 1 1-1.02-2.85M10.5 1.5V4H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Refresh
+          </button>
         </span>
         <div className="accordion-badges">
           {outputList.map(output => (

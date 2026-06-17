@@ -226,6 +226,8 @@ html, body, #root {
   padding: 2px 0;
 }
 
+@keyframes branch-spin { to { transform: rotate(360deg); } }
+
 /* ── Accordion ── */
 .accordion-panel {
   padding: 7px 9px;
