@@ -25,5 +25,13 @@ function removeModuleType() {
 
 export default defineConfig({
   plugins: [react(), viteSingleFile(), removeModuleType()],
-  build: { target: 'es2015' }
+  build: {
+    target: 'es2015',
+    rollupOptions: {
+      output: {
+        format: 'iife',
+        name: 'OBSOverseer',
+      }
+    }
+  }
 })
