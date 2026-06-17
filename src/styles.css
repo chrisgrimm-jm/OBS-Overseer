@@ -56,6 +56,23 @@ html, body, #root {
   color: var(--text-dim);
 }
 
+.refresh-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-left: auto;
+}
+.refresh-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ── Connection status ── */
 .status-row {
   display: flex;

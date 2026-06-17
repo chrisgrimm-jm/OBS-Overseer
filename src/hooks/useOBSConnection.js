@@ -46,6 +46,9 @@ export function useOBSConnection() {
   const prevStatsRef = useRef(null)
   // Previous bytes + timestamp per output for live bitrate calculation
   const outputBytesRef = useRef({})
+  // Cached per-output settings and profile encoder (fetched once on connect, not every poll)
+  const outputSettingsCacheRef = useRef({})
+  const profileEncoderRef = useRef({ stream: null, record: null })
 
   const AUDIO_INPUT_KINDS = new Set([
     'wasapi_input_capture', 'wasapi_output_capture',
@@ -108,7 +111,8 @@ export function useOBSConnection() {
       setStats(sessionStats)
       setStreamStatus(stream)
       setRecordStatus(record)
-      // Filter to branch/ISO outputs only — exclude built-in, replay buffer, virtual cam, vertical backtrack
+
+      // Filter to branch/ISO outputs only
       const excludedKinds = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output', 'replay_buffer', 'virtualcam_output'])
       const excludedNamePatterns = /replay.?buffer|virtual.?cam|vertical.?backtrack/i
       const branchOutputs = (outputs.outputs || []).filter(o =>
@@ -116,32 +120,17 @@ export function useOBSConnection() {
         !excludedKinds.has(o.outputName) &&
         !excludedNamePatterns.test(o.outputName)
       )
-      // Get stream + record encoders from OBS profile
-      let profileRecEncoder = null
-      let profileStreamEncoder = null
-      try {
-        const [advRec, advStream, simRec, simStream] = await Promise.all([
-          obs.call('GetProfileParameter', { parameterCategory: 'AdvOut', parameterName: 'RecEncoder' }).catch(() => null),
-          obs.call('GetProfileParameter', { parameterCategory: 'AdvOut', parameterName: 'Encoder' }).catch(() => null),
-          obs.call('GetProfileParameter', { parameterCategory: 'SimpleOutput', parameterName: 'RecEncoder' }).catch(() => null),
-          obs.call('GetProfileParameter', { parameterCategory: 'SimpleOutput', parameterName: 'StreamEncoder' }).catch(() => null),
-        ])
-        profileRecEncoder = advRec?.parameterValue || simRec?.parameterValue || null
-        profileStreamEncoder = advStream?.parameterValue || simStream?.parameterValue || null
-      } catch {}
-      setEncoders({ stream: profileStreamEncoder, record: profileRecEncoder })
 
       const now = Date.now()
+      const profileRecEncoder = profileEncoderRef.current.record
 
-      // Fetch settings + status for each branch output
+      // Fetch only status per output (settings are cached from connect)
       const withDetails = await Promise.all(
         branchOutputs.map(async o => {
-          const [settingsRes, statusRes] = await Promise.all([
-            obs.call('GetOutputSettings', { outputName: o.outputName }).catch(() => ({ outputSettings: {} })),
-            obs.call('GetOutputStatus', { outputName: o.outputName }).catch(() => ({})),
-          ])
+          const statusRes = await obs.call('GetOutputStatus', { outputName: o.outputName }).catch(() => ({}))
           const active = statusRes.outputActive ?? o.outputActive ?? false
           const totalBytes = statusRes.outputBytes ?? 0
+          const cachedSettings = outputSettingsCacheRef.current[o.outputName] || {}
 
           // Calculate live bitrate from bytes delta
           let liveBitrateKbps = null
@@ -161,7 +150,7 @@ export function useOBSConnection() {
 
           return {
             ...o,
-            settings: { ...(settingsRes.outputSettings || {}), _profileEncoder: profileRecEncoder },
+            settings: { ...cachedSettings, _profileEncoder: profileRecEncoder },
             outputActive: active,
             outputTotalBytes: totalBytes,
             outputTotalFrames: statusRes.outputTotalFrames ?? o.outputTotalFrames ?? 0,
@@ -234,10 +223,43 @@ export function useOBSConnection() {
       const { obsVersion: ver } = await obs.connect(url, s.password || undefined)
       if (!mountedRef.current) return
       backoffRef.current = 1000
-      encodeLagBaseRef.current = null  // reset so first poll sets a fresh baseline
+      encodeLagBaseRef.current = null
       prevStatsRef.current = null
+      outputSettingsCacheRef.current = {}
+      outputBytesRef.current = {}
       setObsVersion(ver)
       setStatus('connected')
+
+      // Fetch profile encoders once on connect
+      try {
+        const [advRec, advStream, simRec, simStream] = await Promise.all([
+          obs.call('GetProfileParameter', { parameterCategory: 'AdvOut', parameterName: 'RecEncoder' }).catch(() => null),
+          obs.call('GetProfileParameter', { parameterCategory: 'AdvOut', parameterName: 'Encoder' }).catch(() => null),
+          obs.call('GetProfileParameter', { parameterCategory: 'SimpleOutput', parameterName: 'RecEncoder' }).catch(() => null),
+          obs.call('GetProfileParameter', { parameterCategory: 'SimpleOutput', parameterName: 'StreamEncoder' }).catch(() => null),
+        ])
+        const record = advRec?.parameterValue || simRec?.parameterValue || null
+        const stream = advStream?.parameterValue || simStream?.parameterValue || null
+        profileEncoderRef.current = { stream, record }
+        setEncoders({ stream, record })
+      } catch {}
+
+      // Fetch output settings once on connect and cache them
+      try {
+        const { outputs } = await obs.call('GetOutputList')
+        const excludedKinds = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output', 'replay_buffer', 'virtualcam_output'])
+        const excludedNamePatterns = /replay.?buffer|virtual.?cam|vertical.?backtrack/i
+        const branchOutputs = (outputs || []).filter(o =>
+          !excludedKinds.has(o.outputKind) &&
+          !excludedKinds.has(o.outputName) &&
+          !excludedNamePatterns.test(o.outputName)
+        )
+        await Promise.all(branchOutputs.map(async o => {
+          const res = await obs.call('GetOutputSettings', { outputName: o.outputName }).catch(() => ({ outputSettings: {} }))
+          outputSettingsCacheRef.current[o.outputName] = res.outputSettings || {}
+        }))
+      } catch {}
+
       poll(obs)
       pollTimerRef.current = setInterval(() => poll(obs), POLL_INTERVAL)
 
