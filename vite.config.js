@@ -18,6 +18,8 @@ function removeModuleType() {
         .replace(/<script type="module"/g, '<script defer')
         .replace(/<script crossorigin>/g, '<script defer>')
         .replace(/<script crossorigin /g, '<script defer ')
+        .replace(/<style rel="stylesheet" crossorigin>/g, '<style>')
+        .replace(/<style rel="stylesheet" crossorigin /g, '<style ')
       fs.writeFileSync(outFile, fixed)
     }
   }
