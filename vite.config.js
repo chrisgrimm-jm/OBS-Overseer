@@ -13,9 +13,11 @@ function removeModuleType() {
       if (!fs.existsSync(outFile)) return
       const html = fs.readFileSync(outFile, 'utf8')
       const fixed = html
-        .replace(/<script type="module"/g, '<script')
-        .replace(/<script crossorigin>/g, '<script>')
-        .replace(/<script crossorigin /g, '<script ')
+        .replace(/<script type="module" crossorigin>/g, '<script defer>')
+        .replace(/<script type="module" crossorigin /g, '<script defer ')
+        .replace(/<script type="module"/g, '<script defer')
+        .replace(/<script crossorigin>/g, '<script defer>')
+        .replace(/<script crossorigin /g, '<script defer ')
       fs.writeFileSync(outFile, fixed)
     }
   }
