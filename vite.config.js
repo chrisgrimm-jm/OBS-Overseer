@@ -12,7 +12,10 @@ function removeModuleType() {
       const outFile = path.resolve('dist/index.html')
       if (!fs.existsSync(outFile)) return
       const html = fs.readFileSync(outFile, 'utf8')
-      const fixed = html.replace(/<script type="module"/g, '<script')
+      const fixed = html
+        .replace(/<script type="module"/g, '<script')
+        .replace(/<script crossorigin>/g, '<script>')
+        .replace(/<script crossorigin /g, '<script ')
       fs.writeFileSync(outFile, fixed)
     }
   }
@@ -20,5 +23,5 @@ function removeModuleType() {
 
 export default defineConfig({
   plugins: [react(), viteSingleFile(), removeModuleType()],
-  build: { target: 'chrome110' }
+  build: { target: 'es2015' }
 })
