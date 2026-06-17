@@ -176,8 +176,9 @@ export function useOBSConnection() {
     stopPolling()
 
     if (obsRef.current) {
-      try { await obsRef.current.disconnect() } catch {}
-      obsRef.current = null
+      const old = obsRef.current
+      obsRef.current = null  // clear before disconnect so ConnectionClosed guard fires
+      try { await old.disconnect() } catch {}
     }
 
     const obs = new OBSWebSocket()
