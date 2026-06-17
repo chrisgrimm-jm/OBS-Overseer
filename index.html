@@ -7,18 +7,6 @@
   </head>
   <body style="background:#1a1a1a;color:#e0e0e0;margin:0;padding:0;">
     <div id="root"></div>
-    <script>
-      // Diagnostic: turn page lime green if JS runs, red on any error
-      document.documentElement.style.background = 'lime';
-      window.onerror = function(msg, src, line, col, err) {
-        document.documentElement.style.background = 'red';
-        document.body.innerHTML = '<pre style="color:white;padding:20px;font-size:14px">' + msg + '\n' + (err && err.stack || '') + '</pre>';
-      };
-      window.addEventListener('unhandledrejection', function(e) {
-        document.documentElement.style.background = 'red';
-        document.body.innerHTML = '<pre style="color:white;padding:20px;font-size:14px">' + e.reason + '</pre>';
-      });
-    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
