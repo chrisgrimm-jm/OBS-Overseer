@@ -315,8 +315,26 @@ export function useOBSConnection() {
     connect()
   }, [connect])
 
-  const refreshOutputs = useCallback(() => {
-    if (obsRef.current) poll(obsRef.current)
+  const refreshOutputs = useCallback(async () => {
+    const obs = obsRef.current
+    if (!obs) return
+    // Re-fetch and re-cache output settings so new/changed outputs are picked up
+    try {
+      const excludedKinds = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output', 'replay_buffer', 'virtualcam_output'])
+      const excludedNamePatterns = /replay.?buffer|virtual.?cam|vertical.?backtrack/i
+      const { outputs } = await obs.call('GetOutputList')
+      const branchOutputs = (outputs || []).filter(o =>
+        !excludedKinds.has(o.outputKind) &&
+        !excludedKinds.has(o.outputName) &&
+        !excludedNamePatterns.test(o.outputName)
+      )
+      outputSettingsCacheRef.current = {}
+      await Promise.all(branchOutputs.map(async o => {
+        const res = await obs.call('GetOutputSettings', { outputName: o.outputName }).catch(() => ({ outputSettings: {} }))
+        outputSettingsCacheRef.current[o.outputName] = res.outputSettings || {}
+      }))
+    } catch {}
+    poll(obs)
   }, [poll])
 
   useEffect(() => {

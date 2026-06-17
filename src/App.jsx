@@ -78,7 +78,7 @@ export default function App() {
         <span className="app-title">OBS Overseer</span>
         <StatusDot status={status} />
         {obsVersion && <span className="obs-version">v{obsVersion}</span>}
-        <button className="refresh-btn" onClick={reconnect}>↺ Refresh</button>
+        <button className="refresh-btn" onClick={refreshOutputs}>↺ Refresh</button>
       </header>
 
       {/* Alert bar — only shown when red alerts exist */}
