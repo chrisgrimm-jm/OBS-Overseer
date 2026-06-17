@@ -72,7 +72,7 @@ export default function App() {
   const recPaused = recInfo?.outputPaused
 
   return (
-    <div className="app">
+    <div className="app" style={{background:'#1a1a1a',color:'#e0e0e0',minHeight:'100vh'}}>
       {/* Header */}
       <header className="app-header">
         <span className="app-title">OBS Overseer</span>

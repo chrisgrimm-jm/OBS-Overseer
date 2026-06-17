@@ -5,12 +5,12 @@ function DetailTile({ label, value, borderColor, valueColor, tooltip }) {
   return (
     <div
       className="branch-detail-tile"
-      style={{ borderLeftColor: borderColor, cursor: tooltip ? 'help' : 'default' }}
+      style={{ background: '#2e2e2e', borderLeftColor: borderColor || '#666', cursor: tooltip ? 'help' : 'default' }}
       onMouseEnter={() => tooltip && setVisible(true)}
       onMouseLeave={() => setVisible(false)}
     >
-      <span className="branch-detail-label">{label}</span>
-      <span className="branch-detail-value" style={{ color: valueColor, fontSize: value && value.length > 8 ? 11 : undefined }}>
+      <span className="branch-detail-label" style={{ color: '#888' }}>{label}</span>
+      <span className="branch-detail-value" style={{ color: valueColor || '#e0e0e0', fontSize: value && value.length > 8 ? 11 : undefined }}>
         {value || '—'}
       </span>
       {tooltip && visible && <div className="tooltip">{tooltip}</div>}
@@ -97,24 +97,24 @@ function encoderInfo(settings) {
 }
 
 function encodeLagColor(pct) {
-  if (pct == null) return 'var(--text-dim)'
-  if (pct <= 0) return 'var(--green)'
-  if (pct < 1) return 'var(--yellow)'
-  return 'var(--red)'
+  if (pct == null) return '#888'
+  if (pct <= 0) return '#4caf50'
+  if (pct < 1) return '#ffb74d'
+  return '#ef5350'
 }
 
 function encodeLagBorder(pct) {
   if (pct == null) return undefined
-  if (pct <= 0) return 'var(--green)'
-  if (pct < 1) return 'var(--yellow)'
-  return 'var(--red)'
+  if (pct <= 0) return '#4caf50'
+  if (pct < 1) return '#ffb74d'
+  return '#ef5350'
 }
 
 function congestionColor(val) {
-  if (val == null) return 'var(--text-dim)'
-  if (val < 0.25) return 'var(--green)'
-  if (val < 0.6) return 'var(--yellow)'
-  return 'var(--red)'
+  if (val == null) return '#888'
+  if (val < 0.25) return '#4caf50'
+  if (val < 0.6) return '#ffb74d'
+  return '#ef5350'
 }
 
 function OutputDetail({ output }) {
@@ -142,7 +142,7 @@ function OutputDetail({ output }) {
         label="Encode Lag"
         value={active ? `${skippedPct.toFixed(2)}%` : '—'}
         borderColor={active ? encodeLagBorder(skippedPct) : undefined}
-        valueColor={active ? encodeLagColor(skippedPct) : 'var(--text-dim)'}
+        valueColor={active ? encodeLagColor(skippedPct) : '#888'}
         tooltip={active
           ? `${skipped} frames skipped out of ${total} (${skippedPct.toFixed(2)}%)\n\nEncoder lag means the encoder couldn't process frames fast enough and had to drop them.\n\nThresholds: 0% great · <1% warning · ≥1% critical\n\n${lagAdvice}`
           : 'Output not currently recording.'}
@@ -157,7 +157,7 @@ function OutputDetail({ output }) {
       <DetailTile
         label="Congestion"
         value={active && congestion != null ? `${(congestion * 100).toFixed(0)}%` : '—'}
-        valueColor={active ? congestionColor(congestion) : 'var(--text-dim)'}
+        valueColor={active ? congestionColor(congestion) : '#888'}
         borderColor={active ? congestionColor(congestion) : undefined}
         tooltip={active
           ? `Encoder queue congestion: ${congestion != null ? (congestion * 100).toFixed(0) : '—'}%\n\nReflects how backed up the encoder's internal frame queue is. High congestion means frames are piling up faster than the encoder can process them.\n\nThresholds: <25% good · 25–60% warning · >60% critical\n\nFor software encoders, high congestion usually means the CPU preset is too slow for the frame rate.`
@@ -186,7 +186,7 @@ export function BranchOutputPanel({ outputList, onRefresh }) {
   if (!outputList || outputList.length === 0) return null
 
   return (
-    <div className="panel accordion-panel">
+    <div className="panel accordion-panel" style={{ background: '#252525', color: '#e0e0e0' }}>
       <div className="accordion-header" onClick={() => setExpanded(e => !e)}>
         <span className="panel-title" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           Branch Outputs
@@ -196,9 +196,9 @@ export function BranchOutputPanel({ outputList, onRefresh }) {
             title="Refresh output list"
             style={{
               background: 'none',
-              border: '1px solid var(--border)',
+              border: '1px solid #3a3a3a',
               borderRadius: 4,
-              color: 'var(--text-dim)',
+              color: '#888',
               cursor: 'pointer',
               padding: '2px 7px',
               fontSize: 10,
