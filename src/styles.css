@@ -234,7 +234,6 @@ html, body, #root {
   flex-direction: column;
   justify-content: space-between;
   cursor: default;
-  overflow: hidden;
 }
 
 .stat-tile-tip { cursor: help; }
