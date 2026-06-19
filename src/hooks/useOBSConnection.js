@@ -14,6 +14,7 @@ export function loadSettings() {
     host: params.get('host') || stored.host || 'localhost',
     port: params.get('port') || stored.port || '4455',
     password: params.get('password') || stored.password || '',
+    claudeApiKey: stored.claudeApiKey || '',
     vdoGuests: stored.vdoGuests || [],
   }
 }

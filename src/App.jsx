@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useCallback } from 'react'
 import { useOBSConnection } from './hooks/useOBSConnection.js'
 import { StatTile } from './components/StatTile.jsx'
 import { BranchOutputPanel } from './components/BranchOutputPanel.jsx'
@@ -24,8 +24,53 @@ function formatTimecode(tc) {
   return tc.split('.')[0]
 }
 
+async function diagnoseWithClaude(apiKey, alerts, stats, outputList) {
+  const activeOutputs = (outputList || []).filter(o => o.outputActive).map(o => ({
+    name: o.outputName,
+    bitrate: o.liveBitrateKbps ? `${o.liveBitrateKbps} kbps` : 'N/A',
+    encodeLag: o.outputTotalFrames > 0 ? `${((o.outputSkippedFrames / o.outputTotalFrames) * 100).toFixed(2)}%` : '0%',
+    congestion: o.outputCongestion != null ? `${(o.outputCongestion * 100).toFixed(0)}%` : 'N/A',
+  }))
+
+  const snapshot = [
+    `Active alerts: ${alerts.join(', ')}`,
+    `OBS CPU: ${stats?.cpuUsage?.toFixed(1) ?? 'N/A'}%`,
+    `OBS RAM: ${stats?.memoryUsage?.toFixed(0) ?? 'N/A'} MB`,
+    `FPS: ${stats?.activeFps?.toFixed(2) ?? 'N/A'}`,
+    `Render lag: ${stats?.renderSkippedFrames && stats?.renderTotalFrames ? ((stats.renderSkippedFrames / stats.renderTotalFrames) * 100).toFixed(2) : '0'}%`,
+    `Active branch outputs: ${activeOutputs.length}`,
+    ...activeOutputs.map(o => `  ${o.name} — bitrate: ${o.bitrate}, encode lag: ${o.encodeLag}, congestion: ${o.congestion}`),
+  ].join('\n')
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      system: 'You are a live production assistant for OBS Studio. The user is mid-production and needs fast help. Be direct and specific — 2-3 sentences max. Give the most likely cause and one concrete fix they can do right now.',
+      messages: [{ role: 'user', content: `My OBS monitor is showing these alerts:\n\n${snapshot}\n\nWhat is likely wrong and what should I do?` }],
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error?.message || `API error ${res.status}`)
+  }
+
+  const data = await res.json()
+  return data.content?.[0]?.text || 'No response received.'
+}
+
 export default function App() {
   const { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, encoders, settings, saveSettings, reconnect, refreshOutputs } = useOBSConnection()
+  const [diagnosis, setDiagnosis] = useState(null)   // null | 'loading' | { text } | { error }
+  const [diagVisible, setDiagVisible] = useState(false)
 
   function handleSaveSettings(newSettings) {
     saveSettings(newSettings)
@@ -65,6 +110,18 @@ export default function App() {
 
   const allAlerts = [...streamAlerts, ...sysAlerts, ...encodeAlerts, ...congestionAlerts]
 
+  const handleDiagnose = useCallback(async () => {
+    if (!settings.claudeApiKey) return
+    setDiagnosis('loading')
+    setDiagVisible(true)
+    try {
+      const text = await diagnoseWithClaude(settings.claudeApiKey, allAlerts, stats, outputList)
+      setDiagnosis({ text })
+    } catch (err) {
+      setDiagnosis({ error: err.message })
+    }
+  }, [settings.claudeApiKey, allAlerts, stats, outputList])
+
   // Status badges for stream + record
   const streamActive = streamStatus?.outputActive
   const streamDuration = streamStatus?.outputTimecode ? formatTimecode(streamStatus.outputTimecode) : null
@@ -87,6 +144,22 @@ export default function App() {
           {allAlerts.map((a, i) => (
             <span key={i} className="alert-chip">⚠ {a}</span>
           ))}
+          {settings.claudeApiKey && (
+            <button className="diagnose-btn" onClick={handleDiagnose} disabled={diagnosis === 'loading'}>
+              {diagnosis === 'loading' ? 'Diagnosing…' : '✦ Diagnose'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* AI diagnosis panel */}
+      {diagVisible && diagnosis && diagnosis !== 'loading' && (
+        <div className={`diagnosis-panel ${diagnosis.error ? 'diagnosis-error' : ''}`}>
+          <div className="diagnosis-header">
+            <span className="diagnosis-title">✦ AI Diagnosis</span>
+            <button className="diagnosis-close" onClick={() => { setDiagVisible(false); setDiagnosis(null) }}>✕</button>
+          </div>
+          <p className="diagnosis-text">{diagnosis.error ? `Error: ${diagnosis.error}` : diagnosis.text}</p>
         </div>
       )}
 
