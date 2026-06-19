@@ -173,12 +173,6 @@ export default function App() {
           <span className={`dot dot-${recActive ? (recPaused ? 'yellow' : 'green') : 'gray'}`} />
           {recActive ? (recPaused ? 'PAUSED' : `REC${recInfo.duration ? ' ' + recInfo.duration : ''}`) : 'REC OFF'}
         </span>
-        {outputList && outputList.map(o => (
-          <span key={o.outputName} className={`live-badge ${o.outputActive ? 'live-badge-rec' : 'live-badge-off'}`}>
-            <span className={`dot dot-${o.outputActive ? 'green' : 'gray'}`} />
-            {o.outputName}
-          </span>
-        ))}
       </div>
 
       {/* Key stats grid */}
