@@ -199,6 +199,12 @@ export function useOBSConnection() {
       })
     })
 
+    obs.on('RecordStateChanged', ({ outputState }) => {
+      if (outputState === 'OBS_WEBSOCKET_OUTPUT_STOPPED') {
+        setTimeout(() => location.reload(), 10000)
+      }
+    })
+
     obs.on('ConnectionClosed', () => {
       if (!mountedRef.current) return
       if (obsRef.current !== obs) return // stale handler — fired by a manually-disconnected instance
