@@ -42,19 +42,19 @@ async function diagnoseWithClaude(apiKey, alerts, stats, outputList) {
     ...activeOutputs.map(o => `  ${o.name} — bitrate: ${o.bitrate}, encode lag: ${o.encodeLag}, congestion: ${o.congestion}`),
   ].join('\n')
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true',
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'llama-3.1-8b-instant',
       max_tokens: 200,
-      system: 'You are a live production assistant for OBS Studio. The user is mid-production and needs fast help. Be direct and specific — 2-3 sentences max. Give the most likely cause and one concrete fix they can do right now.',
-      messages: [{ role: 'user', content: `My OBS monitor is showing these alerts:\n\n${snapshot}\n\nWhat is likely wrong and what should I do?` }],
+      messages: [
+        { role: 'system', content: 'You are a live production assistant for OBS Studio. The user is mid-production and needs fast help. Be direct and specific — 2-3 sentences max. Give the most likely cause and one concrete fix they can do right now.' },
+        { role: 'user', content: `My OBS monitor is showing these alerts:\n\n${snapshot}\n\nWhat is likely wrong and what should I do?` },
+      ],
     }),
   })
 
@@ -64,7 +64,7 @@ async function diagnoseWithClaude(apiKey, alerts, stats, outputList) {
   }
 
   const data = await res.json()
-  return data.content?.[0]?.text || 'No response received.'
+  return data.choices?.[0]?.message?.content || 'No response received.'
 }
 
 export default function App() {
