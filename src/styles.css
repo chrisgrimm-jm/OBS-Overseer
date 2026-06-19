@@ -110,6 +110,11 @@ html, body, #root {
   border-radius: 5px;
 }
 
+.alert-bar-warn {
+  background: rgba(255, 183, 77, 0.1) !important;
+  border-color: #ffb74d;
+}
+
 .alert-chip {
   font-size: 11px;
   font-weight: 600;
@@ -118,6 +123,12 @@ html, body, #root {
   border: 1px solid rgba(239, 83, 80, 0.3);
   border-radius: 3px;
   padding: 1px 6px;
+}
+
+.alert-chip-warn {
+  color: #ffb74d !important;
+  background: rgba(255, 183, 77, 0.1) !important;
+  border-color: rgba(255, 183, 77, 0.35);
 }
 
 .diagnose-btn {

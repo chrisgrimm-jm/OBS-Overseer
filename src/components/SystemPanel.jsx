@@ -125,11 +125,16 @@ export function getSystemAlerts(stats) {
   if (!stats) return []
   const t = getSystemTiles(stats)
   const alerts = []
-  if (t.cpuColor === 'red') alerts.push(`CPU ${t.cpu}%`)
-  if (t.memColor === 'red') alerts.push(`Mem ${t.mem}MB`)
-  if (t.diskColor === 'red') alerts.push(`Disk ${t.diskFree}GB`)
-  if (t.fpsColor === 'red') alerts.push(`FPS ${t.fps}`)
-  if (t.renderLagColor === 'red') alerts.push(`Render ${t.renderLag}%`)
+  if (t.cpuColor === 'red') alerts.push({ text: `CPU ${t.cpu}%`, level: 'red' })
+  else if (t.cpuColor === 'yellow') alerts.push({ text: `CPU ${t.cpu}%`, level: 'yellow' })
+  if (t.memColor === 'red') alerts.push({ text: `Mem ${t.mem} GB`, level: 'red' })
+  else if (t.memColor === 'yellow') alerts.push({ text: `Mem ${t.mem} GB`, level: 'yellow' })
+  if (t.diskColor === 'red') alerts.push({ text: `Disk ${t.diskFree} GB`, level: 'red' })
+  else if (t.diskColor === 'yellow') alerts.push({ text: `Disk ${t.diskFree} GB`, level: 'yellow' })
+  if (t.fpsColor === 'red') alerts.push({ text: `FPS ${t.fps}`, level: 'red' })
+  else if (t.fpsColor === 'yellow') alerts.push({ text: `FPS ${t.fps}`, level: 'yellow' })
+  if (t.renderLagColor === 'red') alerts.push({ text: `Render ${t.renderLag}%`, level: 'red' })
+  else if (t.renderLagColor === 'yellow') alerts.push({ text: `Render ${t.renderLag}%`, level: 'yellow' })
   return alerts
 }
 

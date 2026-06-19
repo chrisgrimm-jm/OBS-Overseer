@@ -82,45 +82,47 @@ export default function App() {
   const sysTiles = getSystemTiles(stats)
   const recInfo = getRecordInfo(recordStatus)
 
-  // Alert bar: collect all red-state stats
+  // Alert bar: collect red + yellow state alerts (objects with {text, level})
   const streamAlerts = getStreamAlerts(streamStatus)
   const sysAlerts = getSystemAlerts(stats)
 
-  // Encoder overload alerts — use poll-to-poll rate so it fires while overload is actively happening
   const activeOutputCount = (outputList || []).filter(o => o.outputActive).length
   const pollSkippedRate = stats?.pollSkippedRate ?? null
   const encodeAlerts = []
-  if (pollSkippedRate != null && pollSkippedRate >= 0.5) {
-    encodeAlerts.push(`ENCODER OVERLOAD — ${pollSkippedRate.toFixed(1)}% frames skipped`)
+  if (pollSkippedRate != null && pollSkippedRate >= 1) {
+    encodeAlerts.push({ text: `ENCODER OVERLOAD — ${pollSkippedRate.toFixed(1)}% skipped`, level: 'red' })
+  } else if (pollSkippedRate != null && pollSkippedRate >= 0.5) {
+    encodeAlerts.push({ text: `Encode lag ${pollSkippedRate.toFixed(1)}%`, level: 'yellow' })
   }
 
-  // CPU alert when software outputs are active
   const cpuPct = stats?.cpuUsage ?? null
   if (cpuPct != null && cpuPct >= 80 && activeOutputCount > 0) {
-    encodeAlerts.push(`HIGH CPU ${cpuPct.toFixed(1)}% — ${activeOutputCount} output${activeOutputCount > 1 ? 's' : ''} recording`)
+    encodeAlerts.push({ text: `HIGH CPU ${cpuPct.toFixed(1)}% — ${activeOutputCount} output${activeOutputCount > 1 ? 's' : ''} recording`, level: 'red' })
   }
 
-  // Congestion alerts per output (if OBS does return it)
   const congestionAlerts = (outputList || []).flatMap(o => {
     if (!o.outputActive) return []
     const congestion = o.outputCongestion ?? null
-    if (congestion != null && congestion >= 0.6) return [`${o.outputName} congestion ${(congestion * 100).toFixed(0)}%`]
+    if (congestion != null && congestion >= 0.6) return [{ text: `${o.outputName} congestion ${(congestion * 100).toFixed(0)}%`, level: 'red' }]
+    if (congestion != null && congestion >= 0.25) return [{ text: `${o.outputName} congestion ${(congestion * 100).toFixed(0)}%`, level: 'yellow' }]
     return []
   })
 
   const allAlerts = [...streamAlerts, ...sysAlerts, ...encodeAlerts, ...congestionAlerts]
+  const hasRed = allAlerts.some(a => a.level === 'red')
+  const alertTexts = allAlerts.map(a => a.text)
 
   const handleDiagnose = useCallback(async () => {
     if (!settings.claudeApiKey) return
     setDiagnosis('loading')
     setDiagVisible(true)
     try {
-      const text = await diagnoseWithClaude(settings.claudeApiKey, allAlerts, stats, outputList)
+      const text = await diagnoseWithClaude(settings.claudeApiKey, alertTexts, stats, outputList)
       setDiagnosis({ text })
     } catch (err) {
       setDiagnosis({ error: err.message })
     }
-  }, [settings.claudeApiKey, allAlerts, stats, outputList])
+  }, [settings.claudeApiKey, alertTexts, stats, outputList])
 
   // Status badges for stream + record
   const streamActive = streamStatus?.outputActive
@@ -138,11 +140,11 @@ export default function App() {
         <button className="refresh-btn" onClick={() => location.reload()}>↺ Refresh</button>
       </header>
 
-      {/* Alert bar — only shown when red alerts exist */}
+      {/* Alert bar — red for critical, yellow for warnings */}
       {allAlerts.length > 0 && (
-        <div className="alert-bar">
+        <div className={hasRed ? 'alert-bar' : 'alert-bar alert-bar-warn'}>
           {allAlerts.map((a, i) => (
-            <span key={i} className="alert-chip">⚠ {a}</span>
+            <span key={i} className={a.level === 'yellow' ? 'alert-chip alert-chip-warn' : 'alert-chip'}>⚠ {a.text}</span>
           ))}
           {settings.claudeApiKey && (
             <button className="diagnose-btn" onClick={handleDiagnose} disabled={diagnosis === 'loading'}>

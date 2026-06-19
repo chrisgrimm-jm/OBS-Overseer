@@ -185,8 +185,6 @@ export function BranchOutputPanel({ outputList, onRefresh }) {
 
   if (!outputList || outputList.length === 0) return null
 
-  const selectedOutput = outputList.find(o => o.outputName === selected) || null
-
   return (
     <div className="panel" style={{ background: '#252525', color: '#e0e0e0' }}>
       {/* Header row */}
@@ -211,51 +209,43 @@ export function BranchOutputPanel({ outputList, onRefresh }) {
         </button>
       </div>
 
-      {/* Output chips */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+      {/* Output chips — each expands inline below itself */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {outputList.map(output => {
           const isSelected = selected === output.outputName
           const active = output.outputActive
           return (
-            <button
-              key={output.outputName}
-              onClick={() => setSelected(isSelected ? null : output.outputName)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                padding: '3px 7px', borderRadius: 4, cursor: 'pointer',
-                fontFamily: 'inherit', fontSize: 10, fontWeight: 600,
-                background: isSelected ? (active ? 'rgba(198,40,40,0.25)' : '#333') : (active ? 'rgba(198,40,40,0.12)' : '#2e2e2e'),
-                border: isSelected
-                  ? (active ? '1px solid rgba(198,40,40,0.7)' : '1px solid #666')
-                  : (active ? '1px solid rgba(198,40,40,0.3)' : '1px solid #3a3a3a'),
-                color: active ? '#ef9a9a' : '#888',
-                maxWidth: '100%', overflow: 'hidden',
-                transition: 'background 0.15s, border-color 0.15s',
-              }}
-            >
-              <span className={`dot dot-${active ? 'green' : 'gray'}`} style={{ flexShrink: 0 }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {output.outputName}
-              </span>
-              {active && <span style={{ fontSize: 8, background: '#c62828', color: '#fff', borderRadius: 2, padding: '0 3px', flexShrink: 0 }}>REC</span>}
-              <span style={{ fontSize: 9, color: '#555', flexShrink: 0 }}>{isSelected ? '▾' : '▸'}</span>
-            </button>
+            <div key={output.outputName}>
+              <button
+                onClick={() => setSelected(isSelected ? null : output.outputName)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4, width: '100%',
+                  padding: '4px 8px', borderRadius: 4, cursor: 'pointer',
+                  fontFamily: 'inherit', fontSize: 10, fontWeight: 600,
+                  background: isSelected ? (active ? 'rgba(198,40,40,0.25)' : '#333') : (active ? 'rgba(198,40,40,0.12)' : '#2e2e2e'),
+                  border: isSelected
+                    ? (active ? '1px solid rgba(198,40,40,0.7)' : '1px solid #666')
+                    : (active ? '1px solid rgba(198,40,40,0.3)' : '1px solid #3a3a3a'),
+                  color: active ? '#ef9a9a' : '#888',
+                  transition: 'background 0.15s, border-color 0.15s',
+                }}
+              >
+                <span className={`dot dot-${active ? 'green' : 'gray'}`} style={{ flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
+                  {output.outputName}
+                </span>
+                {active && <span style={{ fontSize: 8, background: '#c62828', color: '#fff', borderRadius: 2, padding: '0 3px', flexShrink: 0 }}>REC</span>}
+                <span style={{ fontSize: 9, color: '#555', flexShrink: 0, marginLeft: 4 }}>{isSelected ? '▾' : '▸'}</span>
+              </button>
+              {isSelected && (
+                <div style={{ marginTop: 4, padding: '6px 4px 2px', borderTop: '1px solid #3a3a3a' }}>
+                  <OutputDetail output={output} />
+                </div>
+              )}
+            </div>
           )
         })}
       </div>
-
-      {/* Expanded detail for selected output */}
-      {selectedOutput && (
-        <div style={{ marginTop: 6, borderTop: '1px solid #3a3a3a', paddingTop: 6 }}>
-          <div className="branch-output-header">
-            <span className="branch-output-name">{selectedOutput.outputName}</span>
-            <span className={`badge ${selectedOutput.outputActive ? 'badge-rec' : 'badge-idle'}`}>
-              {selectedOutput.outputActive ? 'REC' : 'IDLE'}
-            </span>
-          </div>
-          <OutputDetail output={selectedOutput} />
-        </div>
-      )}
     </div>
   )
 }

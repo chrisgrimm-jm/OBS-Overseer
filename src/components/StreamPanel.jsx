@@ -44,8 +44,10 @@ export function getStreamAlerts(streamStatus) {
   const droppedPct = (outputTotalFrames && outputSkippedFrames != null)
     ? parseFloat(((outputSkippedFrames / outputTotalFrames) * 100).toFixed(1))
     : null
-  if (kbps != null && bitrateColor(kbps) === 'red') alerts.push(`Bitrate ${kbps}kbps`)
-  if (droppedPct != null && droppedColor(droppedPct) === 'red') alerts.push(`Dropped ${droppedPct}%`)
+  if (kbps != null && bitrateColor(kbps) === 'red') alerts.push({ text: `Bitrate ${kbps}kbps`, level: 'red' })
+  else if (kbps != null && bitrateColor(kbps) === 'yellow') alerts.push({ text: `Bitrate ${kbps}kbps`, level: 'yellow' })
+  if (droppedPct != null && droppedColor(droppedPct) === 'red') alerts.push({ text: `Dropped ${droppedPct}%`, level: 'red' })
+  else if (droppedPct != null && droppedColor(droppedPct) === 'yellow') alerts.push({ text: `Dropped ${droppedPct}%`, level: 'yellow' })
   return alerts
 }
 
