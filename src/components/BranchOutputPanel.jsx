@@ -172,7 +172,7 @@ function OutputDetail({ output }) {
 }
 
 export function BranchOutputPanel({ outputList, onRefresh }) {
-  const [expanded, setExpanded] = useState(false)
+  const [selected, setSelected] = useState(null)
   const [spinning, setSpinning] = useState(false)
 
   const handleRefresh = useCallback((e) => {
@@ -185,66 +185,75 @@ export function BranchOutputPanel({ outputList, onRefresh }) {
 
   if (!outputList || outputList.length === 0) return null
 
+  const selectedOutput = outputList.find(o => o.outputName === selected) || null
+
   return (
-    <div className="panel accordion-panel" style={{ background: '#252525', color: '#e0e0e0' }}>
-      <div className="accordion-header" onClick={() => setExpanded(e => !e)}>
-        <span className="panel-title" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          Branch Outputs
-          <span className="accordion-arrow">{expanded ? '▾' : '▸'}</span>
-          <button
-            onClick={handleRefresh}
-            title="Refresh output list"
-            style={{
-              background: 'none',
-              border: '1px solid #3a3a3a',
-              borderRadius: 4,
-              color: '#888',
-              cursor: 'pointer',
-              padding: '2px 7px',
-              fontSize: 10,
-              fontFamily: 'inherit',
-              fontWeight: 600,
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              opacity: spinning ? 0.5 : 1,
-              transition: 'opacity 0.15s',
-            }}
-          >
-            <svg
-              width="10" height="10" viewBox="0 0 12 12" fill="none"
-              style={{ animation: spinning ? 'branch-spin 0.6s linear infinite' : 'none' }}
-            >
-              <path d="M10.5 6a4.5 4.5 0 1 1-1.02-2.85M10.5 1.5V4H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Refresh
-          </button>
-        </span>
-        <div className="accordion-badges">
-          {outputList.map(output => (
-            <span key={output.outputName} className={`status-badge ${output.outputActive ? 'status-badge-active' : 'status-badge-idle'}`}>
-              <span className={`dot dot-${output.outputActive ? 'green' : 'gray'}`} />
-              {output.outputName}
-              {output.outputActive && <span className="badge badge-rec" style={{ fontSize: 9, padding: '0 3px' }}>REC</span>}
-            </span>
-          ))}
-        </div>
+    <div className="panel" style={{ background: '#252525', color: '#e0e0e0' }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+        <span className="panel-title" style={{ marginBottom: 0 }}>Branch Outputs</span>
+        <button
+          onClick={handleRefresh}
+          title="Refresh output list"
+          style={{
+            background: 'none', border: '1px solid #3a3a3a', borderRadius: 4,
+            color: '#888', cursor: 'pointer', padding: '1px 6px', fontSize: 9,
+            fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.5px',
+            textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 3,
+            opacity: spinning ? 0.5 : 1, transition: 'opacity 0.15s',
+          }}
+        >
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="none"
+            style={{ animation: spinning ? 'branch-spin 0.6s linear infinite' : 'none' }}>
+            <path d="M10.5 6a4.5 4.5 0 1 1-1.02-2.85M10.5 1.5V4H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Refresh
+        </button>
       </div>
-      {expanded && (
-        <div className="accordion-body">
-          {outputList.map((output) => (
-            <div key={output.outputName} className="branch-output">
-              <div className="branch-output-header">
-                <span className="branch-output-name">{output.outputName}</span>
-                <span className={`badge ${output.outputActive ? 'badge-rec' : 'badge-idle'}`}>
-                  {output.outputActive ? 'REC' : 'IDLE'}
-                </span>
-              </div>
-              <OutputDetail output={output} />
-            </div>
-          ))}
+
+      {/* Output chips */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        {outputList.map(output => {
+          const isSelected = selected === output.outputName
+          const active = output.outputActive
+          return (
+            <button
+              key={output.outputName}
+              onClick={() => setSelected(isSelected ? null : output.outputName)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '3px 7px', borderRadius: 4, cursor: 'pointer',
+                fontFamily: 'inherit', fontSize: 10, fontWeight: 600,
+                background: isSelected ? (active ? 'rgba(198,40,40,0.25)' : '#333') : (active ? 'rgba(198,40,40,0.12)' : '#2e2e2e'),
+                border: isSelected
+                  ? (active ? '1px solid rgba(198,40,40,0.7)' : '1px solid #666')
+                  : (active ? '1px solid rgba(198,40,40,0.3)' : '1px solid #3a3a3a'),
+                color: active ? '#ef9a9a' : '#888',
+                maxWidth: '100%', overflow: 'hidden',
+                transition: 'background 0.15s, border-color 0.15s',
+              }}
+            >
+              <span className={`dot dot-${active ? 'green' : 'gray'}`} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {output.outputName}
+              </span>
+              {active && <span style={{ fontSize: 8, background: '#c62828', color: '#fff', borderRadius: 2, padding: '0 3px', flexShrink: 0 }}>REC</span>}
+              <span style={{ fontSize: 9, color: '#555', flexShrink: 0 }}>{isSelected ? '▾' : '▸'}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Expanded detail for selected output */}
+      {selectedOutput && (
+        <div style={{ marginTop: 6, borderTop: '1px solid #3a3a3a', paddingTop: 6 }}>
+          <div className="branch-output-header">
+            <span className="branch-output-name">{selectedOutput.outputName}</span>
+            <span className={`badge ${selectedOutput.outputActive ? 'badge-rec' : 'badge-idle'}`}>
+              {selectedOutput.outputActive ? 'REC' : 'IDLE'}
+            </span>
+          </div>
+          <OutputDetail output={selectedOutput} />
         </div>
       )}
     </div>
