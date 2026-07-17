@@ -1,6 +1,3 @@
-import React from 'react'
-import { StatTile } from './StatTile.jsx'
-
 function bitrateColor(kbps) {
   if (kbps == null) return 'gray'
   if (kbps >= 2000) return 'green'
@@ -66,16 +63,4 @@ export function getStreamTiles(streamStatus) {
     bitrateTooltip: bitrateTooltip(kbps),
     droppedTooltip: droppedTooltip(droppedPct, outputSkippedFrames, outputTotalFrames),
   }
-}
-
-export function StreamPanel({ streamStatus }) {
-  // Kept for backwards compat but not used in new layout
-  if (!streamStatus) return null
-  const { kbps, droppedPct, kbpsColor, droppedColor: dColor, bitrateTooltip: btt, droppedTooltip: dtt } = getStreamTiles(streamStatus)
-  return (
-    <>
-      <StatTile label="Bitrate" value={kbps} unit=" kbps" color={kbpsColor} tooltip={btt} />
-      <StatTile label="Dropped" value={droppedPct} unit="%" color={dColor} tooltip={dtt} />
-    </>
-  )
 }

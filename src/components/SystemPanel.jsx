@@ -1,6 +1,3 @@
-import React from 'react'
-import { StatTile } from './StatTile.jsx'
-
 function cpuColor(pct) {
   if (pct == null) return 'gray'
   if (pct < 50) return 'green'
@@ -136,20 +133,4 @@ export function getSystemAlerts(stats) {
   if (t.renderLagColor === 'red') alerts.push({ text: `Render ${t.renderLag}%`, level: 'red' })
   else if (t.renderLagColor === 'yellow') alerts.push({ text: `Render ${t.renderLag}%`, level: 'yellow' })
   return alerts
-}
-
-export function SystemPanel({ stats }) {
-  // Kept for backwards compat — not used in new layout
-  if (!stats) return null
-  const t = getSystemTiles(stats)
-  return (
-    <>
-      <StatTile label="CPU" value={t.cpu} unit="%" color={t.cpuColor} tooltip={t.cpuTooltip} />
-      <StatTile label="Memory" value={t.mem} unit=" MB" color={t.memColor} tooltip={t.memTooltip} />
-      <StatTile label="FPS" value={t.fps} color={t.fpsColor} tooltip={t.fpsTooltip} />
-      <StatTile label="Disk Free" value={t.diskFree} unit=" GB" color={t.diskColor} tooltip={t.diskTooltip} />
-      <StatTile label="Render Lag" value={t.renderLag} unit="%" color={t.renderLagColor} tooltip={t.renderLagTooltip} />
-      <StatTile label="Encode Lag" value={t.encodeLag} unit="%" color={t.encodeLagColor} tooltip={t.encodeLagTooltip} />
-    </>
-  )
 }

@@ -68,7 +68,7 @@ async function diagnoseWithClaude(apiKey, alerts, stats, outputList) {
 }
 
 export default function App() {
-  const { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, encoders, settings, saveSettings, reconnect, refreshOutputs } = useOBSConnection()
+  const { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, settings, saveSettings, reconnect, refreshOutputs } = useOBSConnection()
   const [diagnosis, setDiagnosis] = useState(null)   // null | 'loading' | { text } | { error }
   const [diagVisible, setDiagVisible] = useState(false)
 

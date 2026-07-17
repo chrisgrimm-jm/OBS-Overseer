@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 
-const BORDER_COLORS = { green: '#4caf50', yellow: '#ffb74d', red: '#ef5350', gray: '#666', blue: '#4a9eff' }
+const BORDER_COLORS = { green: '#4caf50', yellow: '#ffb74d', red: '#ef5350', gray: '#666' }
 
 export function StatTile({ label, value, unit = '', color = 'gray', tooltip }) {
   const [visible, setVisible] = useState(false)

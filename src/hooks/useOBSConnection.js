@@ -5,6 +5,14 @@ const STORAGE_KEY = 'obs-overseer-settings'
 const POLL_INTERVAL = 1000
 const MAX_BACKOFF = 30000
 
+// Non-branch/ISO outputs to hide from the output list
+const EXCLUDED_KINDS = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output', 'replay_buffer', 'virtualcam_output'])
+const EXCLUDED_NAME_PATTERNS = /replay.?buffer|virtual.?cam|vertical.?backtrack/i
+const isBranchOutput = o =>
+  !EXCLUDED_KINDS.has(o.outputKind) &&
+  !EXCLUDED_KINDS.has(o.outputName) &&
+  !EXCLUDED_NAME_PATTERNS.test(o.outputName)
+
 export function loadSettings() {
   const params = new URLSearchParams(window.location.search)
   const stored = (() => {
@@ -15,7 +23,6 @@ export function loadSettings() {
     port: params.get('port') || stored.port || '4455',
     password: params.get('password') || stored.password || '',
     claudeApiKey: stored.claudeApiKey || '',
-    vdoGuests: stored.vdoGuests || [],
   }
 }
 
@@ -31,7 +38,6 @@ export function useOBSConnection() {
   const [recordStatus, setRecordStatus] = useState(null)
   const [outputList, setOutputList] = useState([])
   const [audioInputs, setAudioInputs] = useState([])
-  const [encoders, setEncoders] = useState({ stream: null, record: null })
   const [settings, setSettingsState] = useState(loadSettings)
 
   const obsRef = useRef(null)
@@ -114,13 +120,7 @@ export function useOBSConnection() {
       setRecordStatus(record)
 
       // Filter to branch/ISO outputs only
-      const excludedKinds = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output', 'replay_buffer', 'virtualcam_output'])
-      const excludedNamePatterns = /replay.?buffer|virtual.?cam|vertical.?backtrack/i
-      const branchOutputs = (outputs.outputs || []).filter(o =>
-        !excludedKinds.has(o.outputKind) &&
-        !excludedKinds.has(o.outputName) &&
-        !excludedNamePatterns.test(o.outputName)
-      )
+      const branchOutputs = (outputs.outputs || []).filter(isBranchOutput)
 
       const now = Date.now()
       const profileRecEncoder = profileEncoderRef.current.record
@@ -238,30 +238,19 @@ export function useOBSConnection() {
       setObsVersion(ver)
       setStatus('connected')
 
-      // Fetch profile encoders once on connect
+      // Fetch record encoder once on connect (only the record encoder is consumed downstream)
       try {
-        const [advRec, advStream, simRec, simStream] = await Promise.all([
+        const [advRec, simRec] = await Promise.all([
           obs.call('GetProfileParameter', { parameterCategory: 'AdvOut', parameterName: 'RecEncoder' }).catch(() => null),
-          obs.call('GetProfileParameter', { parameterCategory: 'AdvOut', parameterName: 'Encoder' }).catch(() => null),
           obs.call('GetProfileParameter', { parameterCategory: 'SimpleOutput', parameterName: 'RecEncoder' }).catch(() => null),
-          obs.call('GetProfileParameter', { parameterCategory: 'SimpleOutput', parameterName: 'StreamEncoder' }).catch(() => null),
         ])
-        const record = advRec?.parameterValue || simRec?.parameterValue || null
-        const stream = advStream?.parameterValue || simStream?.parameterValue || null
-        profileEncoderRef.current = { stream, record }
-        setEncoders({ stream, record })
+        profileEncoderRef.current = { record: advRec?.parameterValue || simRec?.parameterValue || null }
       } catch {}
 
       // Fetch output settings once on connect and cache them
       try {
         const { outputs } = await obs.call('GetOutputList')
-        const excludedKinds = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output', 'replay_buffer', 'virtualcam_output'])
-        const excludedNamePatterns = /replay.?buffer|virtual.?cam|vertical.?backtrack/i
-        const branchOutputs = (outputs || []).filter(o =>
-          !excludedKinds.has(o.outputKind) &&
-          !excludedKinds.has(o.outputName) &&
-          !excludedNamePatterns.test(o.outputName)
-        )
+        const branchOutputs = (outputs || []).filter(isBranchOutput)
         await Promise.all(branchOutputs.map(async o => {
           const res = await obs.call('GetOutputSettings', { outputName: o.outputName }).catch(() => ({ outputSettings: {} }))
           outputSettingsCacheRef.current[o.outputName] = res.outputSettings || {}
@@ -327,14 +316,8 @@ export function useOBSConnection() {
     if (!obs) return
     // Re-fetch and re-cache output settings so new/changed outputs are picked up
     try {
-      const excludedKinds = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output', 'replay_buffer', 'virtualcam_output'])
-      const excludedNamePatterns = /replay.?buffer|virtual.?cam|vertical.?backtrack/i
       const { outputs } = await obs.call('GetOutputList')
-      const branchOutputs = (outputs || []).filter(o =>
-        !excludedKinds.has(o.outputKind) &&
-        !excludedKinds.has(o.outputName) &&
-        !excludedNamePatterns.test(o.outputName)
-      )
+      const branchOutputs = (outputs || []).filter(isBranchOutput)
       outputSettingsCacheRef.current = {}
       await Promise.all(branchOutputs.map(async o => {
         const res = await obs.call('GetOutputSettings', { outputName: o.outputName }).catch(() => ({ outputSettings: {} }))
@@ -355,5 +338,5 @@ export function useOBSConnection() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, encoders, settings, saveSettings, reconnect, refreshOutputs }
+  return { status, obsVersion, stats, streamStatus, recordStatus, outputList, audioInputs, settings, saveSettings, reconnect, refreshOutputs }
 }
