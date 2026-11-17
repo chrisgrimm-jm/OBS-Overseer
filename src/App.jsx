@@ -24,7 +24,7 @@ function formatTimecode(tc) {
   return tc.split('.')[0]
 }
 
-async function diagnoseWithClaude(apiKey, alerts, stats, outputList) {
+async function diagnoseWithGroq(apiKey, alerts, stats, outputList) {
   const activeOutputs = (outputList || []).filter(o => o.outputActive).map(o => ({
     name: o.outputName,
     bitrate: o.liveBitrateKbps ? `${o.liveBitrateKbps} kbps` : 'N/A',
@@ -113,16 +113,16 @@ export default function App() {
   const alertTexts = allAlerts.map(a => a.text)
 
   const handleDiagnose = useCallback(async () => {
-    if (!settings.claudeApiKey) return
+    if (!settings.groqApiKey) return
     setDiagnosis('loading')
     setDiagVisible(true)
     try {
-      const text = await diagnoseWithClaude(settings.claudeApiKey, alertTexts, stats, outputList)
+      const text = await diagnoseWithGroq(settings.groqApiKey, alertTexts, stats, outputList)
       setDiagnosis({ text })
     } catch (err) {
       setDiagnosis({ error: err.message })
     }
-  }, [settings.claudeApiKey, alertTexts, stats, outputList])
+  }, [settings.groqApiKey, alertTexts, stats, outputList])
 
   // Status badges for stream + record
   const streamActive = streamStatus?.outputActive
@@ -146,7 +146,7 @@ export default function App() {
           {allAlerts.map((a, i) => (
             <span key={i} className={a.level === 'yellow' ? 'alert-chip alert-chip-warn' : 'alert-chip'}>⚠ {a.text}</span>
           ))}
-          {settings.claudeApiKey && (
+          {settings.groqApiKey && (
             <button className="diagnose-btn" onClick={handleDiagnose} disabled={diagnosis === 'loading'}>
               {diagnosis === 'loading' ? 'Diagnosing…' : '✦ Diagnose'}
             </button>

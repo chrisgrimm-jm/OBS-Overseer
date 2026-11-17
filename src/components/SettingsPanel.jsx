@@ -5,12 +5,12 @@ export function SettingsPanel({ settings, onSave }) {
   const [host, setHost] = useState(settings.host)
   const [port, setPort] = useState(settings.port)
   const [password, setPassword] = useState(settings.password)
-  const [claudeApiKey, setClaudeApiKey] = useState(settings.claudeApiKey || '')
+  const [groqApiKey, setGroqApiKey] = useState(settings.groqApiKey || '')
   const [saved, setSaved] = useState(false)
 
   function handleSave(e) {
     e.preventDefault()
-    onSave({ host: host.trim() || 'localhost', port: port.trim() || '4455', password, claudeApiKey: claudeApiKey.trim() })
+    onSave({ host: host.trim() || 'localhost', port: port.trim() || '4455', password, groqApiKey: groqApiKey.trim() })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -36,8 +36,8 @@ export function SettingsPanel({ settings, onSave }) {
             <input className="settings-input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="(none)" />
           </label>
           <label className="settings-label">
-            Claude API Key
-            <input className="settings-input" type="password" value={claudeApiKey} onChange={e => setClaudeApiKey(e.target.value)} placeholder="sk-ant-…  (optional)" />
+            Groq API Key (this session only)
+            <input className="settings-input" type="password" value={groqApiKey} onChange={e => setGroqApiKey(e.target.value)} placeholder="gsk_…  (optional)" />
           </label>
           <button className="settings-save" type="submit">
             {saved ? 'Saved — reconnecting…' : 'Save & Reconnect'}

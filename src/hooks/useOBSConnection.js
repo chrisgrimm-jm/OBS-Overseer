@@ -2,32 +2,62 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import OBSWebSocket from 'obs-websocket-js'
 
 const STORAGE_KEY = 'obs-overseer-settings'
+const KEY_SESSION_KEY = 'obs-overseer-groq-key'
 const POLL_INTERVAL = 1000
 const MAX_BACKOFF = 30000
 
-// Non-branch/ISO outputs to hide from the output list
+// Branch Output plugin (OPENSPHERE) filter kind. Its recording/replay output is named after the filter;
+// its streaming outputs are named "<filter> (<n>)". Encoder settings live on the filter, not the output.
+const BRANCH_FILTER_KIND = 'osi_branch_output'
+
 const EXCLUDED_KINDS = new Set(['simple_file_output', 'adv_file_output', 'simple_stream', 'adv_stream_output', 'replay_buffer', 'virtualcam_output'])
-const EXCLUDED_NAME_PATTERNS = /replay.?buffer|virtual.?cam|vertical.?backtrack/i
-const isBranchOutput = o =>
-  !EXCLUDED_KINDS.has(o.outputKind) &&
-  !EXCLUDED_KINDS.has(o.outputName) &&
-  !EXCLUDED_NAME_PATTERNS.test(o.outputName)
+const EXCLUDED_NAMES = /replay.?buffer|virtual.?cam|vertical.?backtrack/i
+const isBranchOutput = o => !EXCLUDED_KINDS.has(o.outputKind) && !EXCLUDED_KINDS.has(o.outputName) && !EXCLUDED_NAMES.test(o.outputName)
+
+const AUDIO_INPUT_KINDS = new Set([
+  'wasapi_input_capture', 'wasapi_output_capture',
+  'coreaudio_input_capture', 'coreaudio_output_capture',
+  'pulse_input_capture', 'pulse_output_capture',
+])
+
+// Map of filterName → { ...filterSettings, _source, _enabled } for every Branch Output filter on any input or scene.
+// ponytail: one GetSourceFilterList per source on connect/refresh; batch with CallBatch if source counts get huge.
+async function fetchBranchFilters(obs) {
+  const [{ inputs }, { scenes }] = await Promise.all([obs.call('GetInputList'), obs.call('GetSceneList')])
+  const sources = [...inputs.map(i => i.inputName), ...scenes.map(s => s.sceneName)]
+  const map = {}
+  await Promise.all(sources.map(async sourceName => {
+    const { filters } = await obs.call('GetSourceFilterList', { sourceName }).catch(() => ({ filters: [] }))
+    for (const f of filters) {
+      if (f.filterKind === BRANCH_FILTER_KIND) map[f.filterName] = { ...f.filterSettings, _source: sourceName, _enabled: f.filterEnabled }
+    }
+  }))
+  return map
+}
 
 export function loadSettings() {
   const params = new URLSearchParams(window.location.search)
   const stored = (() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch { return {} }
   })()
+  if (stored.claudeApiKey) { // scrub the old persisted key
+    delete stored.claudeApiKey
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
+  }
+  let groqApiKey = ''
+  try { groqApiKey = sessionStorage.getItem(KEY_SESSION_KEY) || '' } catch {}
   return {
     host: params.get('host') || stored.host || 'localhost',
     port: params.get('port') || stored.port || '4455',
     password: params.get('password') || stored.password || '',
-    claudeApiKey: stored.claudeApiKey || '',
+    groqApiKey,
   }
 }
 
-export function persistSettings(s) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
+// The AI key stays in sessionStorage only: localStorage on chrisgrimm-jm.github.io is readable by every Pages app on that origin.
+export function persistSettings({ groqApiKey, ...rest }) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(rest))
+  try { groqApiKey ? sessionStorage.setItem(KEY_SESSION_KEY, groqApiKey) : sessionStorage.removeItem(KEY_SESSION_KEY) } catch {}
 }
 
 export function useOBSConnection() {
@@ -42,7 +72,6 @@ export function useOBSConnection() {
 
   const obsRef = useRef(null)
   const pollTimerRef = useRef(null)
-  const mutePollTimerRef = useRef(null)
   const reconnectTimerRef = useRef(null)
   const backoffRef = useRef(1000)
   const mountedRef = useRef(true)
@@ -53,24 +82,13 @@ export function useOBSConnection() {
   const prevStatsRef = useRef(null)
   // Previous bytes + timestamp per output for live bitrate calculation
   const outputBytesRef = useRef({})
-  // Cached per-output settings and profile encoder (fetched once on connect, not every poll)
-  const outputSettingsCacheRef = useRef({})
-  const profileEncoderRef = useRef({ stream: null, record: null })
-
-  const AUDIO_INPUT_KINDS = new Set([
-    'wasapi_input_capture', 'wasapi_output_capture',
-    'coreaudio_input_capture', 'coreaudio_output_capture',
-    'pulse_input_capture', 'pulse_output_capture',
-  ])
+  // Branch Output filter settings (encoder, bitrate, preset…), fetched on connect / refresh
+  const branchFiltersRef = useRef({})
 
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current)
       pollTimerRef.current = null
-    }
-    if (mutePollTimerRef.current) {
-      clearInterval(mutePollTimerRef.current)
-      mutePollTimerRef.current = null
     }
   }, [])
 
@@ -109,29 +127,24 @@ export function useOBSConnection() {
         total: s.outputTotalFrames ?? 0,
       }
 
-      const sessionStats = {
+      setStats({
         ...s,
         outputSkippedFrames: Math.max(0, deltaSkipped),
         outputTotalFrames: Math.max(0, deltaTotal),
         pollSkippedRate, // rate of skipping in the most recent poll interval
-      }
-      setStats(sessionStats)
+      })
       setStreamStatus(stream)
       setRecordStatus(record)
 
-      // Filter to branch/ISO outputs only
       const branchOutputs = (outputs.outputs || []).filter(isBranchOutput)
-
+      const filters = branchFiltersRef.current
       const now = Date.now()
-      const profileRecEncoder = profileEncoderRef.current.record
 
-      // Fetch only status per output (settings are cached from connect)
       const withDetails = await Promise.all(
         branchOutputs.map(async o => {
           const statusRes = await obs.call('GetOutputStatus', { outputName: o.outputName }).catch(() => ({}))
           const active = statusRes.outputActive ?? o.outputActive ?? false
           const totalBytes = statusRes.outputBytes ?? 0
-          const cachedSettings = outputSettingsCacheRef.current[o.outputName] || {}
 
           // Calculate live bitrate from bytes delta
           let liveBitrateKbps = null
@@ -151,7 +164,7 @@ export function useOBSConnection() {
 
           return {
             ...o,
-            settings: { ...cachedSettings, _profileEncoder: profileRecEncoder },
+            settings: filters[o.outputName] || filters[o.outputName.replace(/ \(\d+\)$/, '')] || {},
             outputActive: active,
             outputTotalBytes: totalBytes,
             outputTotalFrames: statusRes.outputTotalFrames ?? o.outputTotalFrames ?? 0,
@@ -162,10 +175,20 @@ export function useOBSConnection() {
           }
         })
       )
+
+      // Branch Output only creates its outputs while running — list idle filters too so every branch is visible
+      const seen = new Set(withDetails.map(o => o.outputName.replace(/ \(\d+\)$/, '')))
+      for (const [name, settings] of Object.entries(filters)) {
+        if (!seen.has(name)) withDetails.push({ outputName: name, outputActive: false, settings, idle: true })
+      }
       setOutputList(withDetails)
     } catch {
       // disconnect handler will fire
     }
+  }, [])
+
+  const loadBranchFilters = useCallback(async (obs) => {
+    branchFiltersRef.current = await fetchBranchFilters(obs).catch(() => ({}))
   }, [])
 
   const connect = useCallback(async () => {
@@ -197,6 +220,11 @@ export function useOBSConnection() {
           : a
         )
       })
+    })
+
+    obs.on('InputMuteStateChanged', ({ inputName, inputMuted }) => {
+      if (!mountedRef.current) return
+      setAudioInputs(prev => prev.map(a => a.inputName === inputName ? { ...a, inputMuted } : a))
     })
 
     obs.on('RecordStateChanged', ({ outputState }) => {
@@ -233,34 +261,16 @@ export function useOBSConnection() {
       backoffRef.current = 1000
       encodeLagBaseRef.current = null
       prevStatsRef.current = null
-      outputSettingsCacheRef.current = {}
       outputBytesRef.current = {}
       setObsVersion(ver)
       setStatus('connected')
 
-      // Fetch record encoder once on connect (only the record encoder is consumed downstream)
-      try {
-        const [advRec, simRec] = await Promise.all([
-          obs.call('GetProfileParameter', { parameterCategory: 'AdvOut', parameterName: 'RecEncoder' }).catch(() => null),
-          obs.call('GetProfileParameter', { parameterCategory: 'SimpleOutput', parameterName: 'RecEncoder' }).catch(() => null),
-        ])
-        profileEncoderRef.current = { record: advRec?.parameterValue || simRec?.parameterValue || null }
-      } catch {}
-
-      // Fetch output settings once on connect and cache them
-      try {
-        const { outputs } = await obs.call('GetOutputList')
-        const branchOutputs = (outputs || []).filter(isBranchOutput)
-        await Promise.all(branchOutputs.map(async o => {
-          const res = await obs.call('GetOutputSettings', { outputName: o.outputName }).catch(() => ({ outputSettings: {} }))
-          outputSettingsCacheRef.current[o.outputName] = res.outputSettings || {}
-        }))
-      } catch {}
+      await loadBranchFilters(obs)
 
       poll(obs)
       pollTimerRef.current = setInterval(() => poll(obs), POLL_INTERVAL)
 
-      // Initialize audio inputs
+      // Initialize audio inputs; mute changes arrive via InputMuteStateChanged
       try {
         const { inputs } = await obs.call('GetInputList')
         const audioList = (inputs || []).filter(i => AUDIO_INPUT_KINDS.has(i.inputKind))
@@ -271,19 +281,6 @@ export function useOBSConnection() {
           })
         )
         if (mountedRef.current) setAudioInputs(withMute)
-        // Poll mute status every 2 seconds
-        mutePollTimerRef.current = setInterval(async () => {
-          if (!mountedRef.current) return
-          const updated = await Promise.all(
-            withMute.map(async a => {
-              const { inputMuted } = await obs.call('GetInputMuteStatus', { inputName: a.inputName }).catch(() => ({ inputMuted: a.inputMuted }))
-              return inputMuted
-            })
-          )
-          if (mountedRef.current) {
-            setAudioInputs(prev => prev.map((a, i) => ({ ...a, inputMuted: updated[i] ?? a.inputMuted })))
-          }
-        }, 2000)
       } catch {
         // audio init failed, non-fatal
       }
@@ -296,7 +293,7 @@ export function useOBSConnection() {
         if (mountedRef.current) connectRef.current?.()
       }, delay)
     }
-  }, [poll, stopPolling])
+  }, [poll, stopPolling, loadBranchFilters])
 
   connectRef.current = connect
 
@@ -311,21 +308,13 @@ export function useOBSConnection() {
     connect()
   }, [connect])
 
+  // Re-read Branch Output filters so new/changed branches (and encoder changes) are picked up
   const refreshOutputs = useCallback(async () => {
     const obs = obsRef.current
     if (!obs) return
-    // Re-fetch and re-cache output settings so new/changed outputs are picked up
-    try {
-      const { outputs } = await obs.call('GetOutputList')
-      const branchOutputs = (outputs || []).filter(isBranchOutput)
-      outputSettingsCacheRef.current = {}
-      await Promise.all(branchOutputs.map(async o => {
-        const res = await obs.call('GetOutputSettings', { outputName: o.outputName }).catch(() => ({ outputSettings: {} }))
-        outputSettingsCacheRef.current[o.outputName] = res.outputSettings || {}
-      }))
-    } catch {}
+    await loadBranchFilters(obs)
     poll(obs)
-  }, [poll])
+  }, [poll, loadBranchFilters])
 
   useEffect(() => {
     mountedRef.current = true

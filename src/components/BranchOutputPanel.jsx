@@ -26,74 +26,25 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
-function droppedStatus(dropped, total) {
-  if (!total) return 'neutral'
-  const pct = dropped / total
-  if (pct > 0.01) return 'red'
-  if (pct > 0.001) return 'yellow'
-  return 'green'
-}
+// Branch Output stores its encoder ID on the filter ("video_encoder"). Matches every NVENC ID OBS has shipped
+// (jim_nvenc, obs_nvenc_h264_tex / _hevc_ / _av1_ in OBS 31+, ffmpeg_nvenc) plus AMD, QSV and Apple VT.
+const HW_ENCODERS = [
+  [/nvenc/i, 'NVENC', 'NVIDIA GPU'],
+  [/amf/i, 'AMD', 'AMD GPU'],
+  [/qsv/i, 'QSV', 'Intel iGPU'],
+  [/videotoolbox/i, 'Apple VT', 'Apple Silicon'],
+]
 
-// Returns { label, isHardware, preset, resourceSummary, resourceTooltip }
-function encoderInfo(settings) {
-  // Branch outputs don't store their encoder in output settings —
-  // we inject _profileEncoder from the OBS profile (AdvOut/SimpleOutput RecEncoder)
-  const enc = settings?._profileEncoder
-    || settings?.encoder
-    || settings?.video_encoder
-    || settings?.['video-encoder']
-    || settings?.videoEncoder
-    || ''
-  if (!enc) {
-    return { label: 'Unknown', isHardware: false, preset: null, resourceSummary: 'Unknown', resourceTooltip: `Could not detect encoder type.\n\nOBS did not return an encoder ID for this output. Check your Recording encoder in OBS Settings → Output.` }
-  }
-
-  const hwEncoders = {
-    'jim_nvenc':                                      { label: 'NVENC H.264',      hw: true,  brand: 'NVIDIA GPU' },
-    'jim_hevc_nvenc':                                 { label: 'NVENC HEVC',        hw: true,  brand: 'NVIDIA GPU' },
-    'jim_av1_nvenc':                                  { label: 'NVENC AV1',         hw: true,  brand: 'NVIDIA GPU' },
-    'com.apple.videotoolbox.videoencoder.ave.avc':    { label: 'Apple VT H.264',    hw: true,  brand: 'Apple Silicon' },
-    'com.apple.videotoolbox.videoencoder.ave.hevc':   { label: 'Apple VT HEVC',     hw: true,  brand: 'Apple Silicon' },
-    'h264_texture_amf':                               { label: 'AMD H.264',         hw: true,  brand: 'AMD GPU' },
-    'hevc_texture_amf':                               { label: 'AMD HEVC',          hw: true,  brand: 'AMD GPU' },
-    'av1_texture_amf':                                { label: 'AMD AV1',           hw: true,  brand: 'AMD GPU' },
-    'obs_qsv11':                                      { label: 'QSV H.264',         hw: true,  brand: 'Intel iGPU' },
-    'obs_qsv11_av1':                                  { label: 'QSV AV1',           hw: true,  brand: 'Intel iGPU' },
-    'obs_x264':                                       { label: 'x264',              hw: false, brand: 'CPU' },
-    'ffmpeg_svt_av1':                                 { label: 'SVT-AV1',           hw: false, brand: 'CPU' },
-    'obs_ffmpeg_openh264':                            { label: 'OpenH264',          hw: false, brand: 'CPU' },
-  }
-
-  const info = hwEncoders[enc] || { label: enc, hw: false, brand: 'CPU' }
-
-  // Preset field varies by encoder
-  const preset = settings?.preset || settings?.preset2 || settings?.Preset || null
-
-  // x264 preset → resource impact
-  const x264PresetImpact = {
-    ultrafast: 'Very low CPU (~5%)',
-    superfast: 'Low CPU (~8%)',
-    veryfast:  'Low CPU (~12%)',
-    faster:    'Moderate CPU (~20%)',
-    fast:      'Moderate CPU (~30%)',
-    medium:    'High CPU (~45%)',
-    slow:      'Very high CPU (~65%)',
-    slower:    'Extreme CPU (~80%)',
-    veryslow:  'Max CPU (~95%)',
-  }
-
-  let resourceSummary, resourceTooltip
-  const profileNote = `\n\n⚠ This reflects your profile's default recording encoder.\nIf this branch output uses a different encoder, OBS WebSocket does not expose per-output overrides — verify in OBS Settings → Output.`
-
-  if (info.hw) {
-    resourceSummary = `HW · ${info.brand}`
-    resourceTooltip = `Hardware encoder (${info.brand})\n\nUses dedicated encode hardware — minimal CPU impact, typically <2% CPU overhead.\n\nBest for recording high bitrate ISO files without affecting stream performance.${profileNote}`
-  } else {
-    resourceSummary = `SW · ${preset || 'CPU'}`
-    resourceTooltip = `Software encoder (${info.brand})\n\n${preset ? `Preset: ${preset}\n${x264PresetImpact[preset.toLowerCase()] || 'Unknown CPU impact'}\n\n` : ''}Software encoders compete with OBS rendering for CPU time.\n\nFor ISO recording, consider switching to a hardware encoder (NVENC/AMF/Apple VT) to reduce CPU load.${profileNote}`
-  }
-
-  return { label: info.label, isHardware: info.hw, preset, resourceSummary, resourceTooltip }
+export function encoderInfo(settings) {
+  const enc = settings?.video_encoder || ''
+  if (!enc) return { label: 'Unknown', tooltip: 'No Branch Output filter matched this output, so its encoder is unknown. Hit Refresh after adding or renaming a branch.' }
+  const codec = /hevc|265/i.test(enc) ? 'HEVC' : /av1/i.test(enc) ? 'AV1' : 'H.264'
+  const hw = HW_ENCODERS.find(([re]) => re.test(enc))
+  const preset = settings.preset2 || settings.preset || null
+  const kbps = settings.bitrate ? `${settings.bitrate} kbps target` : null
+  const detail = [enc, preset && `Preset: ${preset}`, kbps].filter(Boolean).join('\n')
+  if (hw) return { label: `${hw[1]} ${codec}`, hw: true, tooltip: `Hardware encoder (${hw[2]})\n${detail}\n\nRuns on dedicated encode hardware, minimal CPU impact.` }
+  return { label: enc === 'obs_x264' ? 'x264' : enc, hw: false, tooltip: `Software encoder (CPU)\n${detail}\n\nCompetes with OBS rendering for CPU. A hardware encoder (NVENC) is lighter for ISO records.` }
 }
 
 function encodeLagColor(pct) {
@@ -136,8 +87,11 @@ function OutputDetail({ output }) {
     ? `Minor encoder lag — watch for increases during heavy scenes.`
     : `Encoder is keeping up. No lag detected.`
 
+  const enc = encoderInfo(s)
+
   return (
     <div className="branch-detail-grid">
+      <DetailTile label="Encoder" value={enc.label} borderColor={enc.hw ? '#4caf50' : undefined} tooltip={enc.tooltip} />
       <DetailTile
         label="Encode Lag"
         value={active ? `${skippedPct.toFixed(2)}%` : '—'}
@@ -235,6 +189,7 @@ export function BranchOutputPanel({ outputList, onRefresh }) {
                   {output.outputName}
                 </span>
                 {active && <span style={{ fontSize: 8, background: '#c62828', color: '#fff', borderRadius: 2, padding: '0 3px', flexShrink: 0 }}>REC</span>}
+                {output.idle && <span style={{ fontSize: 8, color: '#666', flexShrink: 0 }}>{output.settings?._enabled === false ? 'OFF' : 'IDLE'}</span>}
                 <span style={{ fontSize: 9, color: '#555', flexShrink: 0, marginLeft: 4 }}>{isSelected ? '▾' : '▸'}</span>
               </button>
               {isSelected && (

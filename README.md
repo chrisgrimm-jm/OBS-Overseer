@@ -6,31 +6,15 @@ A real-time stats monitor for OBS Studio, built as a Custom Browser Dock. Monito
 
 ## Install
 
-### 1. Download
-Grab the latest `index.html` from the [Releases](https://github.com/chrisgrimm-jm/OBS-Overseer/releases) page.
-
-### 2. Add to OBS
+### 1. Add to OBS
 1. In OBS, go to **Docks → Custom Browser Docks**
 2. Give it a name (e.g. `Overseer`)
-3. In the URL field, enter the path to the downloaded file with `file://` in front:
-
-**Mac:**
-```
-file:///Users/yourname/Downloads/index.html
-```
-
-**Windows:**
-```
-file:///C:/Users/yourname/Downloads/index.html
-```
-
-> **Tip — Get the exact path on Mac:** Open Terminal, drag the `index.html` file into the Terminal window, and it will paste the full path. Add `file://` to the front of it.
-
-> **Tip — Get the exact path on Windows:** Hold Shift and right-click the file, select **Copy as path**. Replace the backslashes `\` with forward slashes `/` and add `file://` to the front.
-
+3. URL: `https://chrisgrimm-jm.github.io/OBS-Overseer/`
 4. Click **Apply** and the dock will appear in OBS
 
-### 3. Connect to OBS WebSocket
+Use the hosted URL, not a downloaded `file://` copy. OBS's browser locks down local files in ways that break the dock, and the hosted page updates itself on every release.
+
+### 2. Connect to OBS WebSocket
 OBS Overseer connects via OBS WebSocket (built into OBS Studio 28+).
 
 1. In OBS go to **Tools → WebSocket Server Settings**
@@ -57,7 +41,8 @@ OBS Overseer connects via OBS WebSocket (built into OBS Studio 28+).
 | Encode Lag | Frames actively being skipped by the encoder |
 
 ### Branch Outputs (ISO Recording)
-Expandable panel showing per-output stats for each active branch/ISO recording:
+Expandable panel for every [Branch Output](https://github.com/OPENSPHERE-Inc/branch-output) filter (idle ones too) and other ISO outputs:
+- **Encoder** — the encoder that branch actually uses (NVENC/AMD/QSV/Apple VT/x264), read from the Branch Output filter
 - **Encode Lag** — encoder skipped frames for this output
 - **Live Bitrate** — actual kbps being written to disk
 - **Congestion** — encoder queue pressure (early warning before frames drop)
@@ -80,4 +65,5 @@ The red alert bar at the top fires automatically for:
 
 ## Requirements
 - OBS Studio 28 or later (includes built-in WebSocket server)
-- No installation, no build step — just a single HTML file
+- Nothing to install, just the dock URL
+- Optional: a Groq API key for the ✦ Diagnose button. It is kept for the current OBS session only and never saved to disk.
