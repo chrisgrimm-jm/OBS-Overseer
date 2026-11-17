@@ -29,7 +29,11 @@ async function fetchBranchFilters(obs) {
   await Promise.all(sources.map(async sourceName => {
     const { filters } = await obs.call('GetSourceFilterList', { sourceName }).catch(() => ({ filters: [] }))
     for (const f of filters) {
-      if (f.filterKind === BRANCH_FILTER_KIND) map[f.filterName] = { ...f.filterSettings, _source: sourceName, _enabled: f.filterEnabled }
+      if (f.filterKind !== BRANCH_FILTER_KIND) continue
+      // Filter names are only unique per source. Same-named filters on different sources create same-named outputs,
+      // and obs-websocket can only look outputs up by name, so we track every source that shares a name.
+      const sources = [...(map[f.filterName]?._sources || []), sourceName]
+      map[f.filterName] = { ...f.filterSettings, _source: sourceName, _enabled: f.filterEnabled, _sources: sources }
     }
   }))
   return map
@@ -136,7 +140,8 @@ export function useOBSConnection() {
       setStreamStatus(stream)
       setRecordStatus(record)
 
-      const branchOutputs = (outputs.outputs || []).filter(isBranchOutput)
+      // One entry per name: same-named outputs are indistinguishable over the websocket
+      const branchOutputs = [...new Map((outputs.outputs || []).filter(isBranchOutput).map(o => [o.outputName, o])).values()]
       const filters = branchFiltersRef.current
       const now = Date.now()
 

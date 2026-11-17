@@ -89,6 +89,16 @@ function OutputDetail({ output }) {
 
   const enc = encoderInfo(s)
 
+  if (s._sources?.length > 1) {
+    return (
+      <div style={{ color: '#ffb74d', fontSize: 11, lineHeight: 1.4, padding: '2px 4px' }}>
+        {s._sources.length} Branch Output filters are all named "{output.outputName}" (on {s._sources.join(', ')}).
+        OBS can only report one of them by that name, so their stats get mixed together.
+        Give each filter a unique name (right-click the source → Filters), then hit Refresh.
+      </div>
+    )
+  }
+
   return (
     <div className="branch-detail-grid">
       <DetailTile label="Encoder" value={enc.label} borderColor={enc.hw ? '#4caf50' : undefined} tooltip={enc.tooltip} />
@@ -188,6 +198,7 @@ export function BranchOutputPanel({ outputList, onRefresh }) {
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
                   {output.outputName}
                 </span>
+                {output.settings?._sources?.length > 1 && <span style={{ fontSize: 8, color: '#ffb74d', flexShrink: 0 }}>×{output.settings._sources.length} SAME NAME</span>}
                 {active && <span style={{ fontSize: 8, background: '#c62828', color: '#fff', borderRadius: 2, padding: '0 3px', flexShrink: 0 }}>REC</span>}
                 {output.idle && <span style={{ fontSize: 8, color: '#666', flexShrink: 0 }}>{output.settings?._enabled === false ? 'OFF' : 'IDLE'}</span>}
                 <span style={{ fontSize: 9, color: '#555', flexShrink: 0, marginLeft: 4 }}>{isSelected ? '▾' : '▸'}</span>

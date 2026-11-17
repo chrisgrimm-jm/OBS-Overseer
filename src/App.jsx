@@ -108,7 +108,10 @@ export default function App() {
     return []
   })
 
-  const allAlerts = [...streamAlerts, ...sysAlerts, ...encodeAlerts, ...congestionAlerts]
+  const dupAlerts = (outputList || []).filter(o => o.settings?._sources?.length > 1)
+    .map(o => ({ text: `${o.settings._sources.length} branches named "${o.outputName}" — rename them`, level: 'yellow' }))
+
+  const allAlerts = [...streamAlerts, ...sysAlerts, ...encodeAlerts, ...congestionAlerts, ...dupAlerts]
   const hasRed = allAlerts.some(a => a.level === 'red')
   const alertTexts = allAlerts.map(a => a.text)
 
